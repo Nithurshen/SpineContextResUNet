@@ -18,16 +18,16 @@ The project is built specifically to utilize **Metal Performance Shaders (MPS)**
 
 ---
 
-## 🏗 Project Structure
+## Project Structure
 
 ```bash
 ├── src/
-│   ├── model.py            # SpineResUNet with Multi-Dilated Context
-│   ├── dataset.py          # 3D NIfTI Loader (Preprocessing & Normalization)
-│   └── train.py            # Training loop with Dice + BCE Hybrid Loss
-├── models/                 # Saved weights (best_model.pth)
-├── visualizations/         # Epoch-wise prediction slices for QA
-└── test_metrics_dice.csv   # Quantified performance logs
+│   ├── model.py
+│   ├── dataset.py
+│   └── train.py
+├── models/
+├── visualizations/
+└── test_metrics_dice.csv
 
 ```
 
@@ -43,17 +43,6 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 | --- | --- |
 | **Mean Dice Score** | **0.8315** |
 | **Parameter Count** | **1.25M** |
-| **Inference Speed** | **< 2.0s / volume** |
-
-### Visual Verification
-
-During training, the model saves 2D slices to track progress. Below is the typical evolution of the prediction:
-
-* **Input:** Raw Hounsfield Unit (HU) normalized CT slice.
-* **Ground Truth:** Expert-annotated spine mask.
-* **Prediction:** The model's localized probability map.
-
----
 
 ## Research Context
 
