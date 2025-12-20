@@ -2,6 +2,8 @@
 
 **SpineContextResUNet** is a high-efficiency 3D deep learning framework designed to localize the human spine within Computed Tomography (CT) volumes. By leveraging a custom **1.2M parameter architecture**, this project achieves state-of-the-art efficiency, allowing for complex medical image analysis on consumer-grade hardware.
 
+![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_localization.png)
+
 ## Key Innovations
 
 ### 1. Architectural Efficiency
@@ -21,14 +23,27 @@ The project is built specifically to utilize **Metal Performance Shaders (MPS)**
 ## Project Structure
 
 ```bash
-├── src/
-│   ├── model.py
-│   ├── dataset.py
-│   └── train.py
-├── models/
-├── visualizations/
-└── test_metrics_dice.csv
-
+├── checkpoints/             # Saved model states during training
+├── data/                    # Dataset storage (Raw and Preprocessed)
+├── logs/                    # Execution logs
+│   ├── test_set_evaluation.txt
+│   └── training_log.txt
+├── models/                  # Best performing weights
+│   └── best_model.pth
+├── results/                 # Evaluation output
+│   └── test/                # Visual results and subject-wise masks
+├── src/                     # Core project source code
+│   ├── dataset.py           # 3D NIfTI Loader and Normalization
+│   ├── evaluate.py          # Full test set evaluation script
+│   ├── model.py             # SpineResUNet Architecture
+│   ├── param_count.py       # Model efficiency metrics
+│   ├── preprocess.py        # Data preparation logic
+│   └── train.py             # Training loop logic
+├── visualizations/          # Stage 1 training visualizations
+├── inference.py             # Single-instance prediction script
+├── README.md                # Project documentation
+├── requirements.txt         # Environment dependencies
+└── test_metrics_dice.csv    # Quantified Dice performance logs
 ```
 
 ---
@@ -43,6 +58,10 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 | --- | --- |
 | **Mean Dice Score** | **0.8315** |
 | **Parameter Count** | **1.25M** |
+
+### Result Images
+
+The evaluation files generated during testing, including subject-specific segmentation masks and sagittal visual overlays, are automatically stored in the `results/test/` directory for easy verification and analysis.
 
 ## Research Context
 
