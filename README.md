@@ -1,6 +1,6 @@
 # SpineContextResUNet: Efficient 3D Spinal Localization
 
-**SpineContextResUNet** is a high-efficiency 3D deep learning framework designed to localize the human spine within Computed Tomography (CT) volumes. By leveraging a custom **1.2M parameter architecture**, this project achieves state-of-the-art efficiency, allowing for complex medical image analysis on consumer-grade hardware.
+**SpineContextResUNet** is a high-efficiency 3D deep learning framework designed to localize the human spine within Computed Tomography (CT) volumes. By leveraging a custom **1.7M parameter architecture**, this project achieves state-of-the-art efficiency, allowing for complex medical image analysis on consumer-grade hardware.
 
 ![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_localization.png)
 
@@ -8,7 +8,7 @@
 
 ### 1. Architectural Efficiency
 
-Most 3D medical segmentation models (like the standard 3D U-Net) contain 30M+ parameters. **SpineContextResUNet** uses only **1.25 Million parameters**, representing a ~25x reduction in size while maintaining high segmentation accuracy.
+Most 3D medical segmentation models (like the standard 3D U-Net) contain 30M+ parameters. **SpineContextResUNet** uses only **1.7 Million parameters**, representing a ~17x reduction in size while maintaining high segmentation accuracy.
 
 ### 2. Multi-Dilated Context Bottleneck
 
@@ -23,27 +23,26 @@ The project is built specifically to utilize **Metal Performance Shaders (MPS)**
 ## Project Structure
 
 ```bash
-├── checkpoints/             # Saved model states during training
-├── data/                    # Dataset storage (Raw and Preprocessed)
-├── logs/                    # Execution logs
+├── checkpoints/
+├── logs/
 │   ├── test_set_evaluation.txt
 │   └── training_log.txt
-├── models/                  # Best performing weights
+├── models/
 │   └── best_model.pth
-├── results/                 # Evaluation output
-│   └── test/                # Visual results and subject-wise masks
-├── src/                     # Core project source code
-│   ├── dataset.py           # 3D NIfTI Loader and Normalization
-│   ├── evaluate.py          # Full test set evaluation script
-│   ├── model.py             # SpineResUNet Architecture
-│   ├── param_count.py       # Model efficiency metrics
-│   ├── preprocess.py        # Data preparation logic
-│   └── train.py             # Training loop logic
-├── visualizations/          # Stage 1 training visualizations
-├── inference.py             # Single-instance prediction script
-├── README.md                # Project documentation
-├── requirements.txt         # Environment dependencies
-└── test_metrics_dice.csv    # Quantified Dice performance logs
+├── results/
+│   └── test/
+├── src/
+│   ├── dataset.py
+│   ├── evaluate.py
+│   ├── model.py
+│   ├── param_count.py
+│   ├── preprocess.py
+│   └── train.py
+├── visualizations/
+├── inference.py
+├── README.md
+├── requirements.txt
+└── test_metrics_dice.csv
 ```
 
 ---
