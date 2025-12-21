@@ -57,7 +57,7 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 | Metric | Result |
 | --- | --- |
 | **Mean Dice Score** | **0.8315** |
-| **Parameter Count** | **1.25M** |
+| **Parameter Count** | **1,703,841** |
 
 ### Result Images
 
