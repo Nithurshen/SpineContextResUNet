@@ -28,24 +28,27 @@ def compute_dice(pred, gt):
     dice = (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
     return dice
 
+
 def save_instance_visual(ct_vol, pred_mask, subject_id, output_dir):
     """Saves a mid-sagittal 2D overlay of the localization result."""
-    mid_idx = ct_vol.shape[0] // 2 
+    mid_idx = ct_vol.shape[0] // 2
     ct_slice = ct_vol[mid_idx, :, :].T
     mask_slice = pred_mask[mid_idx, :, :].T
 
     fig, ax = plt.subplots(figsize=(10, 20))
-    ax.imshow(ct_slice, cmap='gray', origin='lower')
-    
+    ax.imshow(ct_slice, cmap="gray", origin="lower")
+
     # Blue mask overlay for binary localization
     masked_mask = np.ma.masked_where(mask_slice == 0, mask_slice)
-    ax.imshow(masked_mask, cmap='winter', alpha=0.4, origin='lower')
+    ax.imshow(masked_mask, cmap="winter", alpha=0.4, origin="lower")
 
-    ax.set_title(f"Localization: {subject_id}", color='white', fontsize=14)
-    ax.axis('off')
-    
+    ax.set_title(f"Localization: {subject_id}", color="white", fontsize=14)
+    ax.axis("off")
+
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, f"{subject_id}_localization.png"), facecolor='black')
+    plt.savefig(
+        os.path.join(output_dir, f"{subject_id}_localization.png"), facecolor="black"
+    )
     plt.close()
 
 
