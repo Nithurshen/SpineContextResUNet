@@ -2,8 +2,6 @@
 
 **SpineContextResUNet** is a high-efficiency 3D deep learning framework designed to localize the human spine within Computed Tomography (CT) volumes. By leveraging a custom **1.7M parameter architecture**, this project achieves state-of-the-art efficiency, allowing for complex medical image analysis on consumer-grade hardware.
 
-![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_localization.png)
-
 ## Key Innovations
 
 ### 1. Architectural Efficiency
@@ -58,9 +56,13 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 | **Mean Dice Score** | **0.8315** |
 | **Parameter Count** | **1,703,841** |
 
+![training_plot](https://github.com/Nithurshen/SpineContextResUNet/blob/main/training_metrics.png)
+
 ### Result Images
 
 The evaluation files generated during testing, including subject-specific segmentation masks and sagittal visual overlays, are automatically stored in the `results/test/` directory for easy verification and analysis.
+
+![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_localization.png)
 
 ## Research Context
 
