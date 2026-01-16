@@ -1,0 +1,87 @@
+(venv) nithurshen@Nithurshens-MacBook Evaluation % python3 ./nnunet.py
+--- Evaluating 73 Test Volumes (TotalSegmentator) ---
+Mode: NORMAL (1.5mm)
+Subject ID      | Dice Score  
+-----------------------------------
+sub-gl108       | 0.8805                                                                                                                             
+sub-gl146       | 0.8700                                                                                                                             
+sub-gl195       | 0.8729                                                                                                                             
+sub-gl216       | 0.8392                                                                                                                             
+sub-gl217       | 0.8411                                                                                                                             
+sub-gl279       | 0.8869                                                                                                                             
+sub-gl348       | 0.8486                                                                                                                             
+sub-gl419       | 0.8278                                                                                                                             
+sub-gl428       | 0.8576                                                                                                                             
+sub-gl492       | 0.7997
+sub-verse502    | 0.8608                                                                                                                             
+sub-verse509    | 0.9111                                                                                                                             
+sub-verse512    | 0.8880                                                                                                                             
+sub-verse517    | 0.8993                                                                                                                             
+sub-verse524    | 0.9015                                                                                                                             
+sub-verse526    | 0.8837                                                                                                                             
+sub-verse540    | 0.9092                                                                                                                             
+sub-verse546    | 0.8626                                                                                                                             
+sub-verse550    | 0.8619                                                                                                                             
+sub-verse551    | 0.9129                                                                                                                             
+sub-verse552    | 0.8795                                                                                                                             
+sub-verse555    | 0.8717                                                                                                                             
+sub-verse558    | 0.9046                                                                                                                             
+sub-verse560    | 0.9035                                                                                                                             
+sub-verse563    | 0.8585                                                                                                                             
+sub-verse570    | 0.9124                                                                                                                             
+sub-verse572    | 0.8324                                                                                                                             
+sub-verse578    | 0.8851                                                                                                                             
+sub-verse582    | 0.9104                                                                                                                             
+sub-verse587    | 0.8860                                                                                                                             
+sub-verse590    | 0.8396                                                                                                                             
+sub-verse591    | 0.8559                                                                                                                             
+sub-verse597    | 0.8629                                                                                                                             
+sub-verse599    | 0.8725                                                                                                                             
+sub-verse602    | 0.9091                                                                                                                             
+sub-verse604    | 0.8780                                                                                                                             
+sub-verse607    | 0.9057                                                                                                                             
+sub-verse613    | 0.8921                                                                                                                             
+sub-verse616    | 0.8486                                                                                                                             
+sub-verse617    | 0.8060                                                                                                                             
+sub-verse620    | 0.8930                                                                                                                             
+sub-verse626    | 0.8989                                                                                                                             
+sub-verse647    | 0.8635                                                                                                                             
+sub-verse648    | 0.8428                                                                                                                             
+sub-verse649    | 0.9140                                                                                                                             
+sub-verse650    | 0.8193                                                                                                                             
+sub-verse651    | 0.8477                                                                                                                             
+sub-verse700    | 0.8882                                                                                                                             
+sub-verse702    | 0.8595                                                                                                                             
+sub-verse704    | 0.8895                                                                                                                             
+sub-verse706    | 0.8844                                                                                                                             
+sub-verse708    | 0.8794                                                                                                                             
+sub-verse710    | 0.8608                                                                                                                             
+sub-verse712    | 0.8735                                                                                                                             
+sub-verse714    | 0.8519                                                                                                                             
+sub-verse716    | 0.8511                                                                                                                             
+sub-verse718    | 0.8499                                                                                                                             
+sub-verse751    | 0.8920                                                                                                                             
+sub-verse752    | 0.8978                                                                                                                             
+sub-verse754    | 0.8244                                                                                                                             
+sub-verse756    | 0.8946                                                                                                                             
+sub-verse758    | 0.9053                                                                                                                             
+sub-verse760    | 0.8979                                                                                                                             
+sub-verse762    | 0.8567                                                                                                                             
+sub-verse764    | 0.8328                                                                                                                             
+sub-verse766    | 0.9124                                                                                                                             
+sub-verse768    | 0.9043                                                                                                                             
+sub-verse801    | 0.8433                                                                                                                             
+sub-verse803    | 0.8892                                                                                                                             
+sub-verse804    | 0.8755                                                                                                                             
+sub-verse809    | 0.9146                                                                                                                             
+sub-verse810    | 0.8975                                                                                                                             
+sub-verse813    | 0.8874                                                                                                                             
+Overall Progress: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 73/73 [4:03:31<00:00, 200.16s/it]
+
+========================================
+FINAL TEST SET PERFORMANCE SUMMARY (TotalSegmentator)
+Mean Dice Score : 0.8743 ± 0.0279
+Best Case       : 0.9146 (sub-verse809)
+Worst Case      : 0.7997 (sub-gl492)
+========================================
+Results saved to test_metrics_dice_totalsegmentator.csv
