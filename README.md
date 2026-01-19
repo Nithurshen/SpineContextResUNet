@@ -54,7 +54,7 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 | Metric | Result |
 | --- | --- |
 | **Mean Dice Score (VerSe2020)** | **0.8813** |
-| **Mean Dice Score (CTSpine1K)** | **0.8549** |
+| **Mean Dice Score (CTSpine1K)** | **0.8817** |
 | **Parameter Count** | **1,703,841** |
 
 ![training_plot](https://github.com/Nithurshen/SpineContextResUNet/blob/main/training_metrics.png)
