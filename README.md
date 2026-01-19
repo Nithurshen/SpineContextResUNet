@@ -63,7 +63,7 @@ The model was rigorously tested across multiple datasets (VerSe and Global clini
 
 The evaluation files generated during testing, including subject-specific segmentation masks and sagittal visual overlays, are automatically stored in the `results/test/` directory for easy verification and analysis.
 
-![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_localization.png)
+![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/test/sub-verse758_analysis.png)
 
 ## Research Context
 
