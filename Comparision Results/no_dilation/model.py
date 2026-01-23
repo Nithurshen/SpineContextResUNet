@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ResidualBlock(nn.Module):
-    """ Standard Residual Block """
+    """Standard Residual Block"""
+
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
@@ -11,12 +13,12 @@ class ResidualBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm3d(out_channels)
-        
+
         self.shortcut = nn.Sequential()
         if in_channels != out_channels:
             self.shortcut = nn.Sequential(
                 nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1),
-                nn.BatchNorm3d(out_channels)
+                nn.BatchNorm3d(out_channels),
             )
 
     def forward(self, x):
@@ -26,6 +28,7 @@ class ResidualBlock(nn.Module):
         out += residual
         return self.relu(out)
 
+
 class ContextBlock_NoDilation(nn.Module):
     """
     ABLATION VERSION: No Dilation.
@@ -33,13 +36,22 @@ class ContextBlock_NoDilation(nn.Module):
     - All paddings set to 1 (CRITICAL FIX).
     This restricts the model to only see local features.
     """
+
     def __init__(self, in_channels, out_channels):
         super(ContextBlock_NoDilation, self).__init__()
         # FIX: Padding must be 1 if Dilation is 1
-        self.d1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, dilation=1)
-        self.d2 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, dilation=1) 
-        self.d4 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, dilation=1)
-        self.d8 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, dilation=1)
+        self.d1 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=3, padding=1, dilation=1
+        )
+        self.d2 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=3, padding=1, dilation=1
+        )
+        self.d4 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=3, padding=1, dilation=1
+        )
+        self.d8 = nn.Conv3d(
+            in_channels, out_channels, kernel_size=3, padding=1, dilation=1
+        )
 
         self.fusion = nn.Sequential(
             nn.BatchNorm3d(out_channels * 4),
@@ -56,6 +68,7 @@ class ContextBlock_NoDilation(nn.Module):
         o8 = self.d8(x)
         return self.fusion(torch.cat([o1, o2, o4, o8], dim=1))
 
+
 class SpineResUNet_NoDilation(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, base_filters=16):
         super(SpineResUNet_NoDilation, self).__init__()
@@ -70,11 +83,17 @@ class SpineResUNet_NoDilation(nn.Module):
         # USE THE NO-DILATION CONTEXT BLOCK
         self.bottleneck = ContextBlock_NoDilation(base_filters * 4, base_filters * 8)
 
-        self.up3 = nn.ConvTranspose3d(base_filters * 8, base_filters * 4, kernel_size=2, stride=2)
+        self.up3 = nn.ConvTranspose3d(
+            base_filters * 8, base_filters * 4, kernel_size=2, stride=2
+        )
         self.dec3 = ResidualBlock(base_filters * 8, base_filters * 4)
-        self.up2 = nn.ConvTranspose3d(base_filters * 4, base_filters * 2, kernel_size=2, stride=2)
+        self.up2 = nn.ConvTranspose3d(
+            base_filters * 4, base_filters * 2, kernel_size=2, stride=2
+        )
         self.dec2 = ResidualBlock(base_filters * 4, base_filters * 2)
-        self.up1 = nn.ConvTranspose3d(base_filters * 2, base_filters, kernel_size=2, stride=2)
+        self.up1 = nn.ConvTranspose3d(
+            base_filters * 2, base_filters, kernel_size=2, stride=2
+        )
         self.dec1 = ResidualBlock(base_filters * 2, base_filters)
         self.final = nn.Conv3d(base_filters, out_channels, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
@@ -88,12 +107,21 @@ class SpineResUNet_NoDilation(nn.Module):
         p3 = self.pool3(e3)
         b = self.bottleneck(p3)
         d3 = self.up3(b)
-        if d3.shape != e3.shape: d3 = F.interpolate(d3, size=e3.shape[2:], mode="trilinear", align_corners=False)
+        if d3.shape != e3.shape:
+            d3 = F.interpolate(
+                d3, size=e3.shape[2:], mode="trilinear", align_corners=False
+            )
         d3 = self.dec3(torch.cat([d3, e3], dim=1))
         d2 = self.up2(d3)
-        if d2.shape != e2.shape: d2 = F.interpolate(d2, size=e2.shape[2:], mode="trilinear", align_corners=False)
+        if d2.shape != e2.shape:
+            d2 = F.interpolate(
+                d2, size=e2.shape[2:], mode="trilinear", align_corners=False
+            )
         d2 = self.dec2(torch.cat([d2, e2], dim=1))
         d1 = self.up1(d2)
-        if d1.shape != e1.shape: d1 = F.interpolate(d1, size=e1.shape[2:], mode="trilinear", align_corners=False)
+        if d1.shape != e1.shape:
+            d1 = F.interpolate(
+                d1, size=e1.shape[2:], mode="trilinear", align_corners=False
+            )
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
         return self.sigmoid(self.final(d1))

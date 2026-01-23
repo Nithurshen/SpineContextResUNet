@@ -99,7 +99,7 @@ def predict_sliding_window(model, vol):
                         ).squeeze()
 
                     patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
-                    
+
                     # Standard Inference
                     output = model(patch)
                     pred_patch = output.squeeze().cpu()
@@ -111,8 +111,12 @@ def predict_sliding_window(model, vol):
                         weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
                         weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_pred
-                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_win
+                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_pred
+                    )
+                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_win
+                    )
 
     weight_map[weight_map == 0] = 1.0
     return (prob_map / weight_map).numpy()
@@ -131,20 +135,18 @@ def save_visual(ct_vol, pred_mask, subject_id, output_dir):
 
     # Plot CT Background
     plt.imshow(ct_slice, cmap="gray", origin="lower")
-    
+
     # Plot Prediction Overlay
     masked_pred = np.ma.masked_where(binary_mask == 0, binary_mask)
     plt.imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
-    
+
     plt.title(
         f"Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black"
     )
     plt.axis("off")
 
     plt.tight_layout()
-    plt.savefig(
-        os.path.join(output_dir, f"{subject_id}_pred.png"), facecolor="black"
-    )
+    plt.savefig(os.path.join(output_dir, f"{subject_id}_pred.png"), facecolor="black")
     plt.close()
 
 
@@ -153,7 +155,9 @@ def run_evaluation():
     model = SpineResUNet_cotext_off().to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 
-    vol_files = sorted(glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True))
+    vol_files = sorted(
+        glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
+    )
 
     processed_ids = []
     if os.path.exists(CSV_PATH):
@@ -178,9 +182,11 @@ def run_evaluation():
 
         mask_pattern = os.path.join(TEST_DERIV_DIR, subject_id, "*_seg-vert_msk.nii.gz")
         potential_labels = glob.glob(mask_pattern)
-        
+
         if not potential_labels:
-             potential_labels = glob.glob(os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz"))
+            potential_labels = glob.glob(
+                os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz")
+            )
 
         if not potential_labels:
             print(f"Skipping {subject_id}: Label not found")
@@ -197,7 +203,7 @@ def run_evaluation():
 
             # Updated function call (Removed grad_cam arg, returns only prob map)
             pred_prob = predict_sliding_window(model, vol_data)
-            
+
             pred_bin = (pred_prob > 0.5).astype(np.float32)
             pred_bin = keep_largest_blob(pred_bin)
 

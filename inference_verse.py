@@ -53,7 +53,6 @@ def compute_dice(pred, gt):
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
 
 
-
 class SpineGradCAM:
     def __init__(self, model, target_layer):
         self.model = model
@@ -71,8 +70,8 @@ class SpineGradCAM:
 
     def compute_patch(self, input_tensor):
         use_amp = DEVICE == "cuda"
-        
-        with torch.amp.autocast('cuda', enabled=use_amp):
+
+        with torch.amp.autocast("cuda", enabled=use_amp):
             output = self.model(input_tensor)
             target = torch.logit(output, eps=1e-6).mean()
 
@@ -152,11 +151,22 @@ def predict_sliding_window(model, vol, grad_cam):
                     weighted_cam = weighted_cam[:curr_d, :curr_h, :curr_w]
                     weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_pred
+                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_pred
+                )
                 cam_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_cam
-                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_win
+                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_win
+                )
 
-                del patch, pred_patch, cam_patch, weighted_pred, weighted_win, weighted_cam
+                del (
+                    patch,
+                    pred_patch,
+                    cam_patch,
+                    weighted_pred,
+                    weighted_win,
+                    weighted_cam,
+                )
 
     weight_map[weight_map == 0] = 1.0
     return (prob_map / weight_map).numpy(), (cam_map / weight_map).numpy()
@@ -173,7 +183,7 @@ def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
     if robust_max > 0:
         cam_slice = cam_slice / robust_max
         cam_slice = np.clip(cam_slice, 0, 1)
-    
+
     cam_slice[cam_slice < 0.2] = 0
 
     fig, ax = plt.subplots(1, 2, figsize=(16, 12))
@@ -195,10 +205,10 @@ def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
         backgroundcolor="black",
     )
     ax[1].axis("off")
-    
+
     cbar = plt.colorbar(im, ax=ax[1], fraction=0.046, pad=0.04)
-    cbar.ax.yaxis.set_tick_params(color='white')
-    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
+    cbar.ax.yaxis.set_tick_params(color="white")
+    plt.setp(plt.getp(cbar.ax.axes, "yticklabels"), color="white")
 
     plt.tight_layout()
     plt.savefig(
@@ -214,7 +224,9 @@ def run_evaluation():
 
     grad_cam = SpineGradCAM(model, model.dec1)
 
-    vol_files = sorted(glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True))
+    vol_files = sorted(
+        glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
+    )
 
     processed_ids = []
     if os.path.exists(CSV_PATH):
@@ -239,9 +251,11 @@ def run_evaluation():
 
         mask_pattern = os.path.join(TEST_DERIV_DIR, subject_id, "*_seg-vert_msk.nii.gz")
         potential_labels = glob.glob(mask_pattern)
-        
+
         if not potential_labels:
-             potential_labels = glob.glob(os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz"))
+            potential_labels = glob.glob(
+                os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz")
+            )
 
         if not potential_labels:
             print(f"Skipping {subject_id}: Label not found")

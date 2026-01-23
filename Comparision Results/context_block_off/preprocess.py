@@ -68,7 +68,6 @@ def extract_patches(vol, mask, num_patches):
 
 
 def process_dataset():
-
     for split in ["train", "val"]:
         os.makedirs(os.path.join(PROCESSED_DIR, split, "images"), exist_ok=True)
         os.makedirs(os.path.join(PROCESSED_DIR, split, "masks"), exist_ok=True)

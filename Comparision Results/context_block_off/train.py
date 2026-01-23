@@ -155,7 +155,9 @@ def train():
             print("  --> New Best Model Saved!")
             print("-" * 30)
 
-        torch.save(model.state_dict(), f"checkpoints_context_off/model_epoch_{epoch + 1}.pth")
+        torch.save(
+            model.state_dict(), f"checkpoints_context_off/model_epoch_{epoch + 1}.pth"
+        )
 
 
 if __name__ == "__main__":
