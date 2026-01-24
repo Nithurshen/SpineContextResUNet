@@ -1,0 +1,322 @@
+(venv) nithurshen@Nithurshens-MacBook SpineContextResUNet % python3 ./SwinUNetR/train.py
+--- Starting SwinUNETR Training on mps ---
+Initializing SwinUNETR Micro (~1.8M params)...
+Epoch 1/100 [Train]:   0%|                                                                                                   | 0/305 [00:00<?, ?it/s]/Users/nithurshen/Projects/OUR/Evaluation/SpineContextResUNet/venv/lib/python3.13/site-packages/torch/nn/functional.py:5294: UserWarning: MPS: The constant padding of more than 3 dimensions is not currently supported natively. It uses View Ops default implementation to run. This may have performance implications. (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/mps/operations/Pad.mm:468.)
+  return torch._C._nn.pad(input, pad, mode, value)
+Epoch 1/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:24<00:00,  4.01s/it, batch_loss=0.594]
+Epoch 1 Results (Swin):
+  Train Loss : 1.0485
+  Val Loss   : 0.8734
+  Val Dice   : 0.3604
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 2/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:24<00:00,  4.01s/it, batch_loss=0.738]
+Epoch 2 Results (Swin):
+  Train Loss : 0.7548
+  Val Loss   : 0.7232
+  Val Dice   : 0.4229
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 3/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:26<00:00,  4.02s/it, batch_loss=0.875]
+Epoch 3 Results (Swin):
+  Train Loss : 0.6634
+  Val Loss   : 0.6609
+  Val Dice   : 0.4837
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 4/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:22<00:00,  4.01s/it, batch_loss=0.631]
+Epoch 4 Results (Swin):
+  Train Loss : 0.6139
+  Val Loss   : 0.6162
+  Val Dice   : 0.5155
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 5/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:24<00:00,  4.02s/it, batch_loss=0.451]
+Epoch 5 Results (Swin):
+  Train Loss : 0.5779
+  Val Loss   : 0.5797
+  Val Dice   : 0.5319
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 6/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:26<00:00,  4.02s/it, batch_loss=0.172]
+Epoch 6 Results (Swin):
+  Train Loss : 0.5492
+  Val Loss   : 0.5375
+  Val Dice   : 0.5568
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 7/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:27<00:00,  4.03s/it, batch_loss=0.653]
+Epoch 7 Results (Swin):
+  Train Loss : 0.5318
+  Val Loss   : 0.5290
+  Val Dice   : 0.5635
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 8/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:43<00:00,  4.08s/it, batch_loss=0.611]
+Epoch 8 Results (Swin):
+  Train Loss : 0.5143
+  Val Loss   : 0.5158
+  Val Dice   : 0.5774
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 9/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:37<00:00,  4.06s/it, batch_loss=0.463]
+Epoch 9 Results (Swin):
+  Train Loss : 0.5005
+  Val Loss   : 0.5366
+  Val Dice   : 0.5735
+------------------------------
+Epoch 10/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.576]
+Epoch 10 Results (Swin):
+  Train Loss : 0.4881
+  Val Loss   : 0.5031
+  Val Dice   : 0.5907
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 11/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:26<00:00,  4.02s/it, batch_loss=0.188]
+Epoch 11 Results (Swin):
+  Train Loss : 0.4828
+  Val Loss   : 0.5178
+  Val Dice   : 0.5800
+------------------------------
+Epoch 12/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.186]
+Epoch 12 Results (Swin):
+  Train Loss : 0.4694
+  Val Loss   : 0.4855
+  Val Dice   : 0.5947
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 13/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.691]
+Epoch 13 Results (Swin):
+  Train Loss : 0.4687
+  Val Loss   : 0.4805
+  Val Dice   : 0.5987
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 14/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.284]
+Epoch 14 Results (Swin):
+  Train Loss : 0.4583
+  Val Loss   : 0.4770
+  Val Dice   : 0.6016
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 15/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.259]
+Epoch 15 Results (Swin):
+  Train Loss : 0.4559
+  Val Loss   : 0.4813
+  Val Dice   : 0.5984
+------------------------------
+Epoch 16/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.28]
+Epoch 16 Results (Swin):
+  Train Loss : 0.4449
+  Val Loss   : 0.4777
+  Val Dice   : 0.6062
+------------------------------
+Epoch 17/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.69]
+Epoch 17 Results (Swin):
+  Train Loss : 0.4437
+  Val Loss   : 0.4636
+  Val Dice   : 0.6116
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 18/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.174]
+Epoch 18 Results (Swin):
+  Train Loss : 0.4343
+  Val Loss   : 0.4614
+  Val Dice   : 0.6174
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 19/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.335]
+Epoch 19 Results (Swin):
+  Train Loss : 0.4336
+  Val Loss   : 0.5072
+  Val Dice   : 0.5700
+------------------------------
+Epoch 20/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.301]
+Epoch 20 Results (Swin):
+  Train Loss : 0.4318
+  Val Loss   : 0.4632
+  Val Dice   : 0.6094
+------------------------------
+Epoch 21/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.246]
+Epoch 21 Results (Swin):
+  Train Loss : 0.4250
+  Val Loss   : 0.4456
+  Val Dice   : 0.6187
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 22/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.564]
+Epoch 22 Results (Swin):
+  Train Loss : 0.4254
+  Val Loss   : 0.4625
+  Val Dice   : 0.6102
+------------------------------
+Epoch 23/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.246]
+Epoch 23 Results (Swin):
+  Train Loss : 0.4190
+  Val Loss   : 0.4434
+  Val Dice   : 0.6247
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 24/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.243]
+Epoch 24 Results (Swin):
+  Train Loss : 0.4202
+  Val Loss   : 0.4460
+  Val Dice   : 0.6214
+------------------------------
+Epoch 25/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.351]
+Epoch 25 Results (Swin):
+  Train Loss : 0.4146
+  Val Loss   : 0.4596
+  Val Dice   : 0.6191
+------------------------------
+Epoch 26/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:26<00:00,  4.02s/it, batch_loss=0.635]
+Epoch 26 Results (Swin):
+  Train Loss : 0.4122
+  Val Loss   : 0.4548
+  Val Dice   : 0.6205
+------------------------------
+Epoch 27/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.203]
+Epoch 27 Results (Swin):
+  Train Loss : 0.4082
+  Val Loss   : 0.4343
+  Val Dice   : 0.6289
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 28/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.144]
+Epoch 28 Results (Swin):
+  Train Loss : 0.4115
+  Val Loss   : 0.4390
+  Val Dice   : 0.6235
+------------------------------
+Epoch 29/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.246]
+Epoch 29 Results (Swin):
+  Train Loss : 0.4056
+  Val Loss   : 0.4461
+  Val Dice   : 0.6275
+------------------------------
+Epoch 30/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.579]
+Epoch 30 Results (Swin):
+  Train Loss : 0.4023
+  Val Loss   : 0.4423
+  Val Dice   : 0.6308
+------------------------------
+Epoch 31/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.369]
+Epoch 31 Results (Swin):
+  Train Loss : 0.4039
+  Val Loss   : 0.4412
+  Val Dice   : 0.6355
+------------------------------
+Epoch 32/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.356]
+Epoch 32 Results (Swin):
+  Train Loss : 0.3984
+  Val Loss   : 0.4428
+  Val Dice   : 0.6324
+------------------------------
+Epoch 33/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.589]
+Epoch 33 Results (Swin):
+  Train Loss : 0.4006
+  Val Loss   : 0.4370
+  Val Dice   : 0.6333
+------------------------------
+Epoch 34/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.406]
+Epoch 34 Results (Swin):
+  Train Loss : 0.3820
+  Val Loss   : 0.4250
+  Val Dice   : 0.6400
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 35/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.324]
+Epoch 35 Results (Swin):
+  Train Loss : 0.3748
+  Val Loss   : 0.4236
+  Val Dice   : 0.6390
+------------------------------
+  --> New Best Swin Model Saved!
+Epoch 36/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:28<00:00,  4.03s/it, batch_loss=0.151]
+Epoch 36 Results (Swin):
+  Train Loss : 0.3737
+  Val Loss   : 0.4272
+  Val Dice   : 0.6371
+------------------------------
+Epoch 37/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.176]
+Epoch 37 Results (Swin):
+  Train Loss : 0.3717
+  Val Loss   : 0.4257
+  Val Dice   : 0.6392
+------------------------------
+Epoch 38/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.121]
+Epoch 38 Results (Swin):
+  Train Loss : 0.3705
+  Val Loss   : 0.4243
+  Val Dice   : 0.6399
+------------------------------
+Epoch 39/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.571]
+Epoch 39 Results (Swin):
+  Train Loss : 0.3696
+  Val Loss   : 0.4276
+  Val Dice   : 0.6370
+------------------------------
+Epoch 40/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.176]
+Epoch 40 Results (Swin):
+  Train Loss : 0.3680
+  Val Loss   : 0.4271
+  Val Dice   : 0.6379
+------------------------------
+Epoch 41/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.211]
+Epoch 41 Results (Swin):
+  Train Loss : 0.3684
+  Val Loss   : 0.4245
+  Val Dice   : 0.6408
+------------------------------
+Epoch 42/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.102]
+Epoch 42 Results (Swin):
+  Train Loss : 0.3658
+  Val Loss   : 0.4239
+  Val Dice   : 0.6401
+------------------------------
+Epoch 43/100 [Train]: 100%|███████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.37]
+Epoch 43 Results (Swin):
+  Train Loss : 0.3647
+  Val Loss   : 0.4242
+  Val Dice   : 0.6399
+------------------------------
+Epoch 44/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.409]
+Epoch 44 Results (Swin):
+  Train Loss : 0.3655
+  Val Loss   : 0.4241
+  Val Dice   : 0.6400
+------------------------------
+Epoch 45/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.123]
+Epoch 45 Results (Swin):
+  Train Loss : 0.3650
+  Val Loss   : 0.4246
+  Val Dice   : 0.6397
+------------------------------
+Epoch 46/100 [Train]: 100%|████████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.4]
+Epoch 46 Results (Swin):
+  Train Loss : 0.3645
+  Val Loss   : 0.4248
+  Val Dice   : 0.6394
+------------------------------
+Epoch 47/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.485]
+Epoch 47 Results (Swin):
+  Train Loss : 0.3649
+  Val Loss   : 0.4250
+  Val Dice   : 0.6394
+------------------------------
+Epoch 48/100 [Train]: 100%|█████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.0891]
+Epoch 48 Results (Swin):
+  Train Loss : 0.3646
+  Val Loss   : 0.4250
+  Val Dice   : 0.6394
+------------------------------
+Epoch 49/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.323]
+Epoch 49 Results (Swin):
+  Train Loss : 0.3655
+  Val Loss   : 0.4250
+  Val Dice   : 0.6393
+------------------------------
+Epoch 50/100 [Train]: 100%|██████████████████████████████████████████████████████████████████████| 305/305 [20:25<00:00,  4.02s/it, batch_loss=0.311]
+  Train Loss : 0.3635
+  Val Loss   : 0.4250
+  Val Dice   : 0.6393
