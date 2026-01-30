@@ -21,7 +21,7 @@ MODEL_PATH = "models/best_model.pth"
 TEST_RAW_DIR = "data/raw/dataset-03test/rawdata"
 TEST_DERIV_DIR = "data/raw/dataset-03test/derivatives"
 RESULTS_DIR = "results/verse2020_test_corrected"
-CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_dice_verse.csv")
+CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_verse.csv")
 
 PATCH_SIZE = (128, 128, 64)
 OVERLAP = 0.5
@@ -53,54 +53,29 @@ def compute_dice(pred, gt):
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
 
 
-class SpineGradCAM:
-    def __init__(self, model, target_layer):
-        self.model = model
-        self.target_layer = target_layer
-        self.activations = None
-        self.gradients = None
-        self.target_layer.register_forward_hook(self.save_activation)
-        self.target_layer.register_full_backward_hook(self.save_gradient)
-
-    def save_activation(self, module, input, output):
-        self.activations = output
-
-    def save_gradient(self, module, grad_input, grad_output):
-        self.gradients = grad_output[0]
-
-    def compute_patch(self, input_tensor):
-        use_amp = DEVICE == "cuda"
-
-        with torch.amp.autocast("cuda", enabled=use_amp):
-            output = self.model(input_tensor)
-            target = torch.logit(output, eps=1e-6).mean()
-
-        self.model.zero_grad()
-        target.backward()
-
-        pooled_grads = torch.mean(self.gradients, dim=(2, 3, 4), keepdim=True)
-        weighted_activations = self.activations * pooled_grads
-        heatmap = torch.sum(weighted_activations, dim=1, keepdim=True)
-        heatmap = F.relu(heatmap)
-
-        heatmap = F.interpolate(
-            heatmap.float(),
-            size=input_tensor.shape[2:],
-            mode="trilinear",
-            align_corners=False,
-        )
-
-        return output.detach().float(), heatmap.detach().float()
+def compute_iou(pred, gt):
+    intersection = np.sum(pred * gt)
+    union = np.sum(pred) + np.sum(gt) - intersection
+    return (intersection + 1e-6) / (union + 1e-6)
 
 
-def predict_sliding_window(model, vol, grad_cam):
+def compute_recall(pred, gt):
+    intersection = np.sum(pred * gt)
+    return (intersection + 1e-6) / (np.sum(gt) + 1e-6)
+
+
+def compute_precision(pred, gt):
+    intersection = np.sum(pred * gt)
+    return (intersection + 1e-6) / (np.sum(pred) + 1e-6)
+
+
+def predict_sliding_window(model, vol):
     d, h, w = vol.shape
     pd, ph, pw = PATCH_SIZE
 
     prob_map = torch.zeros(vol.shape, device="cpu")
-    cam_map = torch.zeros(vol.shape, device="cpu")
     weight_map = torch.zeros(vol.shape, device="cpu")
-    patch_window = get_gaussian_window(PATCH_SIZE).cpu()
+    patch_window = get_gaussian_window(PATCH_SIZE).to(DEVICE)
 
     stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
     vol_t = torch.from_numpy(vol).float()
@@ -117,102 +92,66 @@ def predict_sliding_window(model, vol, grad_cam):
 
     model.eval()
 
-    for z in z_steps:
-        for y in y_steps:
-            for x in x_steps:
-                slice_vol = vol_t[z : z + pd, y : y + ph, x : x + pw]
-                curr_d, curr_h, curr_w = slice_vol.shape
+    with torch.no_grad():
+        for z in z_steps:
+            for y in y_steps:
+                for x in x_steps:
+                    slice_vol = vol_t[z : z + pd, y : y + ph, x : x + pw]
+                    curr_d, curr_h, curr_w = slice_vol.shape
 
-                need_pad = False
-                if (curr_d, curr_h, curr_w) != PATCH_SIZE:
-                    need_pad = True
-                    pad_d = pd - curr_d
-                    pad_h = ph - curr_h
-                    pad_w = pw - curr_w
-                    slice_vol = F.pad(
-                        slice_vol.unsqueeze(0).unsqueeze(0),
-                        (0, pad_w, 0, pad_h, 0, pad_d),
-                    ).squeeze()
+                    need_pad = False
+                    if (curr_d, curr_h, curr_w) != PATCH_SIZE:
+                        need_pad = True
+                        pad_d = pd - curr_d
+                        pad_h = ph - curr_h
+                        pad_w = pw - curr_w
+                        slice_vol = F.pad(
+                            slice_vol.unsqueeze(0).unsqueeze(0),
+                            (0, pad_w, 0, pad_h, 0, pad_d),
+                        ).squeeze()
 
-                patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
-                patch.requires_grad = True
+                    patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
+                    output = model(patch)
+                    pred_patch = output.squeeze()
 
-                pred_patch, cam_patch = grad_cam.compute_patch(patch)
+                    weighted_pred = pred_patch * patch_window
+                    weighted_win = patch_window.clone()
 
-                pred_patch = pred_patch.squeeze().cpu()
-                cam_patch = cam_patch.squeeze().cpu()
+                    if need_pad:
+                        weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
+                        weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                weighted_pred = pred_patch * patch_window
-                weighted_cam = cam_patch * patch_window
-                weighted_win = patch_window.clone()
-
-                if need_pad:
-                    weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
-                    weighted_cam = weighted_cam[:curr_d, :curr_h, :curr_w]
-                    weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
-
-                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
-                    weighted_pred
-                )
-                cam_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_cam
-                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
-                    weighted_win
-                )
-
-                del (
-                    patch,
-                    pred_patch,
-                    cam_patch,
-                    weighted_pred,
-                    weighted_win,
-                    weighted_cam,
-                )
+                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_pred.cpu()
+                    )
+                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_win.cpu()
+                    )
 
     weight_map[weight_map == 0] = 1.0
-    return (prob_map / weight_map).numpy(), (cam_map / weight_map).numpy()
+    return (prob_map / weight_map).numpy()
 
 
-def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
+def save_visual(ct_vol, pred_mask, subject_id, output_dir):
     mid_idx = ct_vol.shape[0] // 2
     ct_slice = ct_vol[mid_idx, :, :].T
     mask_slice = pred_mask[mid_idx, :, :].T
-    cam_slice = cam_vol[mid_idx, :, :].T
     binary_mask = (mask_slice > 0.5).astype(np.float32)
 
-    robust_max = np.percentile(cam_vol, 99.5)
-    if robust_max > 0:
-        cam_slice = cam_slice / robust_max
-        cam_slice = np.clip(cam_slice, 0, 1)
+    fig, ax = plt.subplots(figsize=(8, 12))
+    ax.imshow(ct_slice, cmap="gray", origin="lower")
 
-    cam_slice[cam_slice < 0.2] = 0
-
-    fig, ax = plt.subplots(1, 2, figsize=(16, 12))
-
-    ax[0].imshow(ct_slice, cmap="gray", origin="lower")
     masked_pred = np.ma.masked_where(binary_mask == 0, binary_mask)
-    ax[0].imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
-    ax[0].set_title(
+    ax.imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
+
+    ax.set_title(
         f"Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black"
     )
-    ax[0].axis("off")
-
-    ax[1].imshow(ct_slice, cmap="gray", origin="lower")
-    im = ax[1].imshow(cam_slice, cmap="jet", alpha=0.5, origin="lower", vmin=0, vmax=1)
-    ax[1].set_title(
-        f"Grad-CAM (Logits): {subject_id}",
-        fontsize=14,
-        color="white",
-        backgroundcolor="black",
-    )
-    ax[1].axis("off")
-
-    cbar = plt.colorbar(im, ax=ax[1], fraction=0.046, pad=0.04)
-    cbar.ax.yaxis.set_tick_params(color="white")
-    plt.setp(plt.getp(cbar.ax.axes, "yticklabels"), color="white")
+    ax.axis("off")
 
     plt.tight_layout()
     plt.savefig(
-        os.path.join(output_dir, f"{subject_id}_analysis.png"), facecolor="black"
+        os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black"
     )
     plt.close()
 
@@ -221,8 +160,6 @@ def run_evaluation():
     print(f"--- Loading Model on {DEVICE} ---")
     model = SpineResUNet().to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-
-    grad_cam = SpineGradCAM(model, model.dec1)
 
     vol_files = sorted(
         glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
@@ -241,6 +178,8 @@ def run_evaluation():
         detailed_results = pd.read_csv(CSV_PATH).to_dict("records")
 
     print(f"--- Processing {len(vol_files)} VerSe Volumes ---")
+    print(f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}")
+    print("-" * 65)
 
     for vol_path in tqdm(vol_files, desc="Inference"):
         file_name = os.path.basename(vol_path)
@@ -270,18 +209,28 @@ def run_evaluation():
             vol_data = (vol_data + 1000) / 3000
             gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
 
-            pred_prob, cam_vol = predict_sliding_window(model, vol_data, grad_cam)
+            pred_prob = predict_sliding_window(model, vol_data)
             pred_bin = (pred_prob > 0.5).astype(np.float32)
             pred_bin = keep_largest_blob(pred_bin)
 
             dice = compute_dice(pred_bin, gt_data)
+            iou = compute_iou(pred_bin, gt_data)
+            recall = compute_recall(pred_bin, gt_data)
+            precision = compute_precision(pred_bin, gt_data)
 
-            save_visual(vol_data, pred_bin, cam_vol, subject_id, RESULTS_DIR)
+            save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
-            detailed_results.append({"ID": subject_id, "Dice": dice})
+            detailed_results.append({
+                "ID": subject_id, 
+                "Dice": dice,
+                "IoU": iou,
+                "Recall": recall,
+                "Precision": precision
+            })
+            
             pd.DataFrame(detailed_results).to_csv(CSV_PATH, index=False)
 
-            print(f"{subject_id:<30} | {dice:<12.4f}")
+            print(f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}")
 
         except Exception as e:
             print(f"Error processing {subject_id}: {e}")
@@ -291,9 +240,17 @@ def run_evaluation():
 
     if detailed_results:
         dices = [r["Dice"] for r in detailed_results]
-        print("\n" + "=" * 45)
-        print(f"Mean Dice Score : {np.mean(dices):.4f} ± {np.std(dices):.4f}")
-        print("=" * 45)
+        ious = [r["IoU"] for r in detailed_results]
+        recalls = [r["Recall"] for r in detailed_results]
+        precs = [r["Precision"] for r in detailed_results]
+
+        print("\n" + "=" * 55)
+        print("FINAL TEST SET PERFORMANCE SUMMARY")
+        print(f"Dice      : {np.mean(dices):.4f} ± {np.std(dices):.4f}")
+        print(f"IoU       : {np.mean(ious):.4f} ± {np.std(ious):.4f}")
+        print(f"Recall    : {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
+        print(f"Precision : {np.mean(precs):.4f} ± {np.std(precs):.4f}")
+        print("=" * 55)
 
 
 if __name__ == "__main__":
