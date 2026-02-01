@@ -5,23 +5,21 @@ import pandas as pd
 import nibabel as nib
 import os
 import glob
-import gc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
-from src.model import SpineResUNet
+from context_block_off.model import SpineResUNet_cotext_off
 
 DEVICE = (
     "cuda"
     if torch.cuda.is_available()
     else ("mps" if torch.backends.mps.is_available() else "cpu")
 )
-MODEL_PATH = "models/best_model.pth"
+MODEL_PATH = "models/best_model_context_off.pth"
 
-TEST_RAW_DIR = "data/raw/dataset-03test/rawdata"
-TEST_DERIV_DIR = "data/raw/dataset-03test/derivatives"
-RESULTS_DIR = "results/verse2020_test"
-CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_verse.csv")
+TEST_VOL_DIR = "data/raw/CTSpine1k/volumes/test"
+TEST_SEG_DIR = "data/raw/CTSpine1k/labels/test"
+RESULTS_DIR = "results/context_off/ctspine1k"
 
 PATCH_SIZE = (128, 128, 64)
 OVERLAP = 0.5
@@ -29,16 +27,19 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def get_gaussian_window(patch_size):
+    """Generates a 3D Gaussian window for smooth patch blending."""
     d, h, w = patch_size
     z_win = torch.hann_window(d)
     y_win = torch.hann_window(h)
     x_win = torch.hann_window(w)
+
     z_y_win = torch.outer(z_win, y_win)
     window = torch.outer(z_y_win.flatten(), x_win).view(d, h, w)
     return window
 
 
 def keep_largest_blob(mask):
+    """Removes small disconnected noise, keeping only the main spine structure."""
     labeled_mask, num_features = label(mask)
     if num_features == 0:
         return mask
@@ -48,33 +49,53 @@ def keep_largest_blob(mask):
     return (labeled_mask == largest_label).astype(np.float32)
 
 
+# --- METRIC FUNCTIONS ---
+
 def compute_dice(pred, gt):
     intersection = np.sum(pred * gt)
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
 
 
 def compute_iou(pred, gt):
+    """Computes Intersection over Union (IoU)."""
     intersection = np.sum(pred * gt)
     union = np.sum(pred) + np.sum(gt) - intersection
-    return (intersection + 1e-6) / (union + 1e-6)
+    if union == 0:
+        return 1.0 if np.sum(pred) == 0 else 0.0
+    return intersection / (union + 1e-6)
 
 
 def compute_recall(pred, gt):
+    """Computes Recall (Sensitivity): TP / (TP + FN)."""
     intersection = np.sum(pred * gt)
-    return (intersection + 1e-6) / (np.sum(gt) + 1e-6)
+    total_gt = np.sum(gt)
+    if total_gt == 0:
+        return 1.0 if np.sum(pred) == 0 else 0.0
+    return intersection / (total_gt + 1e-6)
 
 
 def compute_precision(pred, gt):
+    """Computes Precision: TP / (TP + FP)."""
     intersection = np.sum(pred * gt)
-    return (intersection + 1e-6) / (np.sum(pred) + 1e-6)
+    total_pred = np.sum(pred)
+    if total_pred == 0:
+        return 1.0 if np.sum(gt) == 0 else 0.0
+    return intersection / (total_pred + 1e-6)
+
+
+# --- END METRIC FUNCTIONS ---
 
 
 def predict_sliding_window(model, vol):
+    """
+    Performs memory-efficient sliding window inference with Gaussian blending.
+    """
     d, h, w = vol.shape
     pd, ph, pw = PATCH_SIZE
 
     prob_map = torch.zeros(vol.shape, device="cpu")
     weight_map = torch.zeros(vol.shape, device="cpu")
+
     patch_window = get_gaussian_window(PATCH_SIZE).to(DEVICE)
 
     stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
@@ -129,13 +150,18 @@ def predict_sliding_window(model, vol):
                     )
 
     weight_map[weight_map == 0] = 1.0
-    return (prob_map / weight_map).numpy()
+    avg_prob = prob_map / weight_map
+
+    return avg_prob.numpy()
 
 
 def save_visual(ct_vol, pred_mask, subject_id, output_dir):
+    """Saves a mid-sagittal slice of the segmentation overlay."""
     mid_idx = ct_vol.shape[0] // 2
+
     ct_slice = ct_vol[mid_idx, :, :].T
     mask_slice = pred_mask[mid_idx, :, :].T
+
     binary_mask = (mask_slice > 0.5).astype(np.float32)
 
     fig, ax = plt.subplots(figsize=(8, 12))
@@ -150,107 +176,104 @@ def save_visual(ct_vol, pred_mask, subject_id, output_dir):
     ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig(
-        os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black"
-    )
+    plt.savefig(os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black")
     plt.close()
 
 
 def run_evaluation():
     print(f"--- Loading Model on {DEVICE} ---")
-    model = SpineResUNet().to(DEVICE)
+    model = SpineResUNet_cotext_off().to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 
-    vol_files = sorted(
-        glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
-    )
+    vol_files = sorted(glob.glob(os.path.join(TEST_VOL_DIR, "*.nii.gz")))
 
-    processed_ids = []
-    if os.path.exists(CSV_PATH):
-        try:
-            processed_ids = pd.read_csv(CSV_PATH)["ID"].astype(str).tolist()
-            print(f"Resuming... Found {len(processed_ids)} processed volumes.")
-        except:
-            pass
+    if not vol_files:
+        print(f"No volume files found in {TEST_VOL_DIR}")
+        return
 
     detailed_results = []
-    if os.path.exists(CSV_PATH):
-        detailed_results = pd.read_csv(CSV_PATH).to_dict("records")
-
-    print(f"--- Processing {len(vol_files)} VerSe Volumes ---")
-    print(f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}")
+    print(f"--- Processing {len(vol_files)} Volumes from CTSpine1K ---")
+    
+    # Header format string (Removed HD95)
+    header_fmt = "{:<20} | {:<8} | {:<8} | {:<8} | {:<9}"
+    row_fmt = "{:<20} | {:<8.4f} | {:<8.4f} | {:<8.4f} | {:<9.4f}"
+    
+    print(header_fmt.format("Subject ID", "Dice", "IoU", "Recall", "Precision"))
     print("-" * 65)
 
     for vol_path in tqdm(vol_files, desc="Inference"):
         file_name = os.path.basename(vol_path)
-        subject_id = file_name.split("_")[0]
+        subject_id = file_name.replace(".nii.gz", "")
 
-        if subject_id in processed_ids:
-            continue
-
-        mask_pattern = os.path.join(TEST_DERIV_DIR, subject_id, "*_seg-vert_msk.nii.gz")
-        potential_labels = glob.glob(mask_pattern)
+        potential_labels = glob.glob(
+            os.path.join(TEST_SEG_DIR, f"{subject_id}*.nii.gz")
+        )
 
         if not potential_labels:
-            potential_labels = glob.glob(
-                os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz")
-            )
-
-        if not potential_labels:
-            print(f"Skipping {subject_id}: Label not found")
+            print(f"\nWarning: Label not found for {subject_id}. Skipping metrics.")
             continue
+
         label_path = potential_labels[0]
 
-        try:
-            vol_nii = nib.as_closest_canonical(nib.load(vol_path))
-            gt_nii = nib.as_closest_canonical(nib.load(label_path))
+        vol_nii = nib.as_closest_canonical(nib.load(vol_path))
+        gt_nii = nib.as_closest_canonical(nib.load(label_path))
+        
+        vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
+        vol_data = (vol_data + 1000) / 3000
+        gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
 
-            vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
-            vol_data = (vol_data + 1000) / 3000
-            gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
+        pred_prob = predict_sliding_window(model, vol_data)
 
-            pred_prob = predict_sliding_window(model, vol_data)
-            pred_bin = (pred_prob > 0.5).astype(np.float32)
-            pred_bin = keep_largest_blob(pred_bin)
+        pred_bin = (pred_prob > 0.5).astype(np.float32)
+        pred_bin = keep_largest_blob(pred_bin)
 
-            dice = compute_dice(pred_bin, gt_data)
-            iou = compute_iou(pred_bin, gt_data)
-            recall = compute_recall(pred_bin, gt_data)
-            precision = compute_precision(pred_bin, gt_data)
+        # --- Calculate Metrics (HD95 Removed) ---
+        dice = compute_dice(pred_bin, gt_data)
+        iou = compute_iou(pred_bin, gt_data)
+        recall = compute_recall(pred_bin, gt_data)
+        precision = compute_precision(pred_bin, gt_data)
 
-            save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
+        detailed_results.append({
+            "ID": subject_id, 
+            "Dice": dice,
+            "IoU": iou,
+            "Recall": recall,
+            "Precision": precision
+        })
 
-            detailed_results.append({
-                "ID": subject_id, 
-                "Dice": dice,
-                "IoU": iou,
-                "Recall": recall,
-                "Precision": precision
-            })
-            
-            pd.DataFrame(detailed_results).to_csv(CSV_PATH, index=False)
+        save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
-            print(f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}")
-
-        except Exception as e:
-            print(f"Error processing {subject_id}: {e}")
-
-        finally:
-            gc.collect()
+        print(row_fmt.format(subject_id, dice, iou, recall, precision))
 
     if detailed_results:
-        dices = [r["Dice"] for r in detailed_results]
-        ious = [r["IoU"] for r in detailed_results]
-        recalls = [r["Recall"] for r in detailed_results]
-        precs = [r["Precision"] for r in detailed_results]
-
-        print("\n" + "=" * 55)
+        # Create DataFrame
+        df = pd.DataFrame(detailed_results)
+        
+        # Calculate summary statistics
+        mean_dice = df["Dice"].mean()
+        mean_iou = df["IoU"].mean()
+        mean_recall = df["Recall"].mean()
+        mean_prec = df["Precision"].mean()
+        
+        print("\n" + "=" * 65)
         print("FINAL TEST SET PERFORMANCE SUMMARY")
-        print(f"Dice      : {np.mean(dices):.4f} ± {np.std(dices):.4f}")
-        print(f"IoU       : {np.mean(ious):.4f} ± {np.std(ious):.4f}")
-        print(f"Recall    : {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
-        print(f"Precision : {np.mean(precs):.4f} ± {np.std(precs):.4f}")
-        print("=" * 55)
+        print(f"Mean Dice     : {mean_dice:.4f} ± {df['Dice'].std():.4f}")
+        print(f"Mean IoU      : {mean_iou:.4f} ± {df['IoU'].std():.4f}")
+        print(f"Mean Recall   : {mean_recall:.4f} ± {df['Recall'].std():.4f}")
+        print(f"Mean Precision: {mean_prec:.4f} ± {df['Precision'].std():.4f}")
+        
+        best_case = df.loc[df['Dice'].idxmax()]
+        worst_case = df.loc[df['Dice'].idxmin()]
+
+        print(f"\nBest Case (Dice) : {best_case['Dice']:.4f} ({best_case['ID']})")
+        print(f"Worst Case (Dice): {worst_case['Dice']:.4f} ({worst_case['ID']})")
+        print("=" * 65)
+
+        csv_path = os.path.join(RESULTS_DIR, "test_metrics_full_ctspine1k.csv")
+        df.to_csv(csv_path, index=False)
+        print(f"Detailed metrics saved to: {csv_path}")
+    else:
+        print("No paired data found for evaluation.")
 
 
 if __name__ == "__main__":

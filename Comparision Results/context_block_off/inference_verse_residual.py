@@ -9,18 +9,18 @@ import gc
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
-from src.model import SpineResUNet
+from context_block_off.model import SpineResUNet_cotext_off
 
 DEVICE = (
     "cuda"
     if torch.cuda.is_available()
     else ("mps" if torch.backends.mps.is_available() else "cpu")
 )
-MODEL_PATH = "models/best_model.pth"
+MODEL_PATH = "models/best_model_context_off.pth"
 
 TEST_RAW_DIR = "data/raw/dataset-03test/rawdata"
 TEST_DERIV_DIR = "data/raw/dataset-03test/derivatives"
-RESULTS_DIR = "results/verse2020_test"
+RESULTS_DIR = "results/context_off/verse2020"
 CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_verse.csv")
 
 PATCH_SIZE = (128, 128, 64)
@@ -158,7 +158,7 @@ def save_visual(ct_vol, pred_mask, subject_id, output_dir):
 
 def run_evaluation():
     print(f"--- Loading Model on {DEVICE} ---")
-    model = SpineResUNet().to(DEVICE)
+    model = SpineResUNet_cotext_off().to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 
     vol_files = sorted(
