@@ -1,112 +1,258 @@
-import os
-# Must be set before torch is imported to handle max_pool3d on MPS
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-
 import torch
-import nibabel as nib
+import torch.nn.functional as F
 import numpy as np
+import pandas as pd
+import nibabel as nib
+import os
+import glob
+import gc
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from scipy.ndimage import label
+from src.model import SpineResUNet
 import time
-import sys
 
-# Ensure the script can find your model file
-sys.path.append('src')
-from model import SpineResUNet
-
-# Configuration
-PATCH_SIZE = (128, 128, 64)
-OVERLAP = 0.25
-VOL_PATH = "data/raw/dataset-03test/rawdata/sub-verse714/sub-verse714_dir-iso_ct.nii.gz"
-MSK_PATH = "data/raw/dataset-03test/derivatives/sub-verse714/sub-verse714_dir-iso_seg-vert_msk.nii.gz"
+DEVICE = "cpu"
 MODEL_PATH = "models/best_model.pth"
+
+TEST_RAW_DIR = "data/raw/dataset-03test/rawdata/sub-verse714/"
+TEST_DERIV_DIR = "data/raw/dataset-03test/derivatives/sub-verse714/"
+RESULTS_DIR = "results/sample2"
+CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_verse.csv")
+
+PATCH_SIZE = (128, 128, 64)
+OVERLAP = 0.5
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def get_gaussian_window(patch_size):
+    d, h, w = patch_size
+    z_win = torch.hann_window(d)
+    y_win = torch.hann_window(h)
+    x_win = torch.hann_window(w)
+    z_y_win = torch.outer(z_win, y_win)
+    window = torch.outer(z_y_win.flatten(), x_win).view(d, h, w)
+    return window
+
+
+def keep_largest_blob(mask):
+    labeled_mask, num_features = label(mask)
+    if num_features == 0:
+        return mask
+    counts = np.bincount(labeled_mask.ravel())
+    counts[0] = 0
+    largest_label = counts.argmax()
+    return (labeled_mask == largest_label).astype(np.float32)
+
 
 def compute_dice(pred, gt):
     intersection = np.sum(pred * gt)
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
 
-def predict_sliding_window(model, vol, device):
+
+def compute_iou(pred, gt):
+    intersection = np.sum(pred * gt)
+    union = np.sum(pred) + np.sum(gt) - intersection
+    return (intersection + 1e-6) / (union + 1e-6)
+
+
+def compute_recall(pred, gt):
+    intersection = np.sum(pred * gt)
+    return (intersection + 1e-6) / (np.sum(gt) + 1e-6)
+
+
+def compute_precision(pred, gt):
+    intersection = np.sum(pred * gt)
+    return (intersection + 1e-6) / (np.sum(pred) + 1e-6)
+
+
+def predict_sliding_window(model, vol):
     d, h, w = vol.shape
     pd, ph, pw = PATCH_SIZE
-    prob_map = np.zeros(vol.shape, dtype=np.float32)
-    weight_map = np.zeros(vol.shape, dtype=np.float32)
-    
-    stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
-    
-    z_steps = sorted(list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)])))
-    y_steps = sorted(list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)])))
-    x_steps = sorted(list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)])))
 
-    model.to(device)
+    prob_map = torch.zeros(vol.shape, device="cpu")
+    weight_map = torch.zeros(vol.shape, device="cpu")
+    patch_window = get_gaussian_window(PATCH_SIZE).to(DEVICE)
+
+    stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
+    vol_t = torch.from_numpy(vol).float()
+
+    z_steps = sorted(
+        list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)]))
+    )
+    y_steps = sorted(
+        list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)]))
+    )
+    x_steps = sorted(
+        list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)]))
+    )
+
     model.eval()
-    
+
     with torch.no_grad():
         for z in z_steps:
             for y in y_steps:
                 for x in x_steps:
-                    # Extract patch and pad if necessary
-                    patch_actual = vol[z:z+pd, y:y+ph, x:x+pw]
-                    curr_d, curr_h, curr_w = patch_actual.shape
-                    
+                    slice_vol = vol_t[z : z + pd, y : y + ph, x : x + pw]
+                    curr_d, curr_h, curr_w = slice_vol.shape
+
+                    need_pad = False
                     if (curr_d, curr_h, curr_w) != PATCH_SIZE:
-                        patch_input = np.pad(patch_actual, (
-                            (0, pd - curr_d), (0, ph - curr_h), (0, pw - curr_w)
-                        ))
-                    else:
-                        patch_input = patch_actual
+                        need_pad = True
+                        pad_d = pd - curr_d
+                        pad_h = ph - curr_h
+                        pad_w = pw - curr_w
+                        slice_vol = F.pad(
+                            slice_vol.unsqueeze(0).unsqueeze(0),
+                            (0, pad_w, 0, pad_h, 0, pad_d),
+                        ).squeeze()
 
-                    patch_t = torch.from_numpy(patch_input).float().unsqueeze(0).unsqueeze(0).to(device)
-                    output = model(patch_t)
-                    
-                    # Offload to CPU and slice to valid dimensions
-                    pred_patch = output.squeeze().cpu().numpy()
-                    prob_map[z:z+curr_d, y:y+curr_h, x:x+curr_w] += pred_patch[:curr_d, :curr_h, :curr_w]
-                    weight_map[z:z+curr_d, y:y+curr_h, x:x+curr_w] += 1.0
+                    patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
+                    output = model(patch)
+                    pred_patch = output.squeeze()
 
-    return prob_map / np.maximum(weight_map, 1e-6)
+                    weighted_pred = pred_patch * patch_window
+                    weighted_win = patch_window.clone()
 
-def run_test():
-    # Load Data
-    vol_nii = nib.load(VOL_PATH)
-    vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
-    vol_data = (vol_data + 1000) / 3000
-    gt_data = (nib.load(MSK_PATH).get_fdata() > 0).astype(np.float32)
+                    if need_pad:
+                        weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
+                        weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-    devices = ["cpu"]
-    if torch.backends.mps.is_available():
-        devices.append("mps")
+                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_pred.cpu()
+                    )
+                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_win.cpu()
+                    )
 
-    for dev_type in devices:
-        device = torch.device(dev_type)
-        print(f"\n--- Testing SpineContextResUNet on {dev_type.upper()} ---")
-        
-        # 1. Initialize Model
-        model = SpineResUNet()
-        
-        # 2. Load Weights
-        checkpoint = torch.load(MODEL_PATH, map_location=device)
-        state_dict = checkpoint['model_state_dict'] if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint else checkpoint
-        model.load_state_dict(state_dict)
+    weight_map[weight_map == 0] = 1.0
+    return (prob_map / weight_map).numpy()
 
-        # 3. MOVE MODEL TO DEVICE (Crucial for MPS)
-        model.to(device)
 
-        # 4. Warm-up pass for GPU
-        if dev_type == "mps":
-            torch.mps.empty_cache()
-            print("Warming up MPS device...")
-            # Ensure dummy input is also on the device
-            dummy = torch.randn(1, 1, 64, 64, 64).to(device)
-            _ = model(dummy)
+def save_visual(ct_vol, pred_mask, subject_id, output_dir):
+    mid_idx = ct_vol.shape[0] // 2
+    ct_slice = ct_vol[mid_idx, :, :].T
+    mask_slice = pred_mask[mid_idx, :, :].T
+    binary_mask = (mask_slice > 0.5).astype(np.float32)
 
-        # Benchmark
-        start_time = time.time()
-        pred_prob = predict_sliding_window(model, vol_data, device)
-        elapsed = time.time() - start_time
-        
-        dice = compute_dice((pred_prob > 0.5).astype(np.float32), gt_data)
-        
-        print(f"Results for {dev_type.upper()}:")
-        print(f"  Time Taken: {elapsed:.2f} seconds")
-        print(f"  Dice Score: {dice:.4f}")
+    fig, ax = plt.subplots(figsize=(8, 12))
+    ax.imshow(ct_slice, cmap="gray", origin="lower")
+
+    masked_pred = np.ma.masked_where(binary_mask == 0, binary_mask)
+    ax.imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
+
+    ax.set_title(
+        f"Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black"
+    )
+    ax.axis("off")
+
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black"
+    )
+    plt.close()
+
+
+def run_evaluation():
+    print(f"--- Loading Model on {DEVICE} ---")
+    model = SpineResUNet().to(DEVICE)
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+
+    vol_files = sorted(
+        glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
+    )
+
+    processed_ids = []
+    if os.path.exists(CSV_PATH):
+        try:
+            processed_ids = pd.read_csv(CSV_PATH)["ID"].astype(str).tolist()
+            print(f"Resuming... Found {len(processed_ids)} processed volumes.")
+        except:
+            pass
+
+    detailed_results = []
+    if os.path.exists(CSV_PATH):
+        detailed_results = pd.read_csv(CSV_PATH).to_dict("records")
+
+    print(f"--- Processing {len(vol_files)} VerSe Volumes ---")
+    print(f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}")
+    print("-" * 65)
+
+    for vol_path in tqdm(vol_files, desc="Inference"):
+        file_name = os.path.basename(vol_path)
+        subject_id = file_name.split("_")[0]
+
+        if subject_id in processed_ids:
+            continue
+
+        mask_pattern = os.path.join(TEST_DERIV_DIR, subject_id, "*_seg-vert_msk.nii.gz")
+        potential_labels = glob.glob(mask_pattern)
+
+        if not potential_labels:
+            potential_labels = glob.glob(
+                os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz")
+            )
+
+        if not potential_labels:
+            print(f"Skipping {subject_id}: Label not found")
+            continue
+        label_path = potential_labels[0]
+
+        try:
+            vol_nii = nib.as_closest_canonical(nib.load(vol_path))
+            gt_nii = nib.as_closest_canonical(nib.load(label_path))
+
+            vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
+            vol_data = (vol_data + 1000) / 3000
+            gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
+
+            t = time.time()
+            pred_prob = predict_sliding_window(model, vol_data)
+            pred_bin = (pred_prob > 0.5).astype(np.float32)
+            pred_bin = keep_largest_blob(pred_bin)
+            elapsed_time = time.time() - t
+
+            dice = compute_dice(pred_bin, gt_data)
+            iou = compute_iou(pred_bin, gt_data)
+            recall = compute_recall(pred_bin, gt_data)
+            precision = compute_precision(pred_bin, gt_data)
+
+            save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
+
+            detailed_results.append({
+                "ID": subject_id, 
+                "Dice": dice,
+                "IoU": iou,
+                "Recall": recall,
+                "Precision": precision,
+                "Time": elapsed_time
+            })
+            
+            pd.DataFrame(detailed_results).to_csv(CSV_PATH, index=False)
+
+            print(f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}")
+
+        except Exception as e:
+            print(f"Error processing {subject_id}: {e}")
+
+        finally:
+            gc.collect()
+
+    if detailed_results:
+        dices = [r["Dice"] for r in detailed_results]
+        ious = [r["IoU"] for r in detailed_results]
+        recalls = [r["Recall"] for r in detailed_results]
+        precs = [r["Precision"] for r in detailed_results]
+
+        print("\n" + "=" * 55)
+        print("FINAL TEST SET PERFORMANCE SUMMARY")
+        print(f"Dice      : {np.mean(dices):.4f} ± {np.std(dices):.4f}")
+        print(f"IoU       : {np.mean(ious):.4f} ± {np.std(ious):.4f}")
+        print(f"Recall    : {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
+        print(f"Precision : {np.mean(precs):.4f} ± {np.std(precs):.4f}")
+        print(f"Time      : {np.mean([r['Time'] for r in detailed_results]):.2f} sec per volume")
+        print("=" * 55)
+
 
 if __name__ == "__main__":
-    run_test()
+    run_evaluation()
