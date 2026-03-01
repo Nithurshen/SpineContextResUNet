@@ -1,70 +1,51 @@
-# SpineContextResUNet: Efficient 3D Spinal Localization
+# SpineContextResUNet: A Computationally Efficient Residual UNet for Spine CT Segmentation
 
-**SpineContextResUNet** is a high-efficiency 3D deep learning framework designed to localize the human spine within Computed Tomography (CT) volumes. By leveraging a custom **1.7M parameter architecture**, this project achieves state-of-the-art efficiency, allowing for complex medical image analysis on consumer-grade hardware.
+## Overview
 
-## Key Innovations
+**SpineContextResUNet** is a lightweight 3D deep learning architecture designed for rapid spinal localization in Computed Tomography (CT) scans. While state-of-the-art models like Transformers or large-scale ensembles demand substantial GPU resources, our model is engineered for edge deployment and resource-constrained clinical environments.
 
-### 1. Architectural Efficiency
+### Key Features
 
-Most 3D medical segmentation models (like the standard 3D U-Net) contain 30M+ parameters. **SpineContextResUNet** uses only **1.7 Million parameters**, representing a ~17x reduction in size while maintaining high segmentation accuracy.
-
-### 2. Multi-Dilated Context Bottleneck
-
-To compensate for its small size, the model utilizes a specialized bottleneck layer with **dilated convolutions**. This allows the network to "see" a larger anatomical area (wider receptive field) to understand the spine's global structure without increasing the number of weights.
-
-### 3. Apple Silicon Optimization
-
-The project is built specifically to utilize **Metal Performance Shaders (MPS)**, enabling high-speed training and inference on Apple M-series chips (M1/M2/M3/M4).
+* **Computationally Efficient:** Features a footprint of only ~1.7M parameters, making it ideal for edge platforms like the Nvidia Jetson Orin Nano.
+* **3D Context Modeling:** Integrates a specialized Context Block using parallel multi-dilated convolutions to capture long-range anatomical dependencies without the memory overhead of Self-Attention or the latency of RNNs.
+* **High Performance:** Achieves a Dice score of 88.17% on CTSpine1K and 88.13% on VerSe2020 datasets.
+* **Hardware Agnostic:** Performs robust inference on standard clerical hardware (Intel Core i5, 8GB RAM) where heavier baselines like TotalSegmentator fail due to memory exhaustion.
 
 ---
 
-## Project Structure
+## ## Architecture
 
-```bash
-├── checkpoints/
-├── logs/
-│   ├── test_set_evaluation.txt
-│   └── training_log.txt
-├── models/
-│   └── best_model.pth
-├── results/
-│   └── test/
-├── src/
-│   ├── dataset.py
-│   ├── evaluate.py
-│   ├── model.py
-│   ├── param_count.py
-│   ├── preprocess.py
-│   └── train.py
-├── visualizations/
-├── inference.py
-├── README.md
-├── requirements.txt
-└── test_metrics_dice.csv
-```
+The architecture follows a U-shaped encoder-decoder topology:
+
+* **Backbone:** Built on Residual Blocks (two $3\times3\times3$ convolutions with BN and ReLU) to facilitate gradient flow.
+* **Context Block (ASPP):** Positioned at the bottleneck, this module uses four parallel branches with dilation rates $r \in \{1, 2, 4, 8\}$ to aggregate multi-scale context.
+* **Loss Function:** A composite $\mathcal{L}_{Total} = \mathcal{L}_{BCE} + \mathcal{L}_{Dice}$ to handle class imbalance and ensure boundary refinement.
 
 ---
 
-## Performance & Results
+## Benchmarks
 
-The model was rigorously tested across multiple datasets (VerSe and Global clinical scans), demonstrating high robustness to different imaging protocols.
+### Segmentation Performance
 
-### Metrics
+| Architecture | Parameters | VerSe2020 (Dice) | CTSpine1K (Dice) |
+| --- | --- | --- | --- |
+| SwinUNETR (Constrained) | 3,746,536 | 0.7387 | 0.7285 |
+| 3D U-Net | 1,788,274 | 0.8144 | 0.8132 |
+| ResUNet | 1,424,545 | 0.8652 | 0.8644 |
+| **SpineContextResUNet** | **1,703,841** | **0.8813** | **0.8817** |
 
-| Metric | Result |
-| --- | --- |
-| **Mean Dice Score (VerSe2020)** | **0.8813** |
-| **Mean Dice Score (CTSpine1K)** | **0.8817** |
-| **Parameter Count** | **1,703,841** |
+### Inference Latency (Seconds)
 
-![training_plot](https://github.com/Nithurshen/SpineContextResUNet/blob/main/training_metrics.png)
+| Model | NVidia T4 GPU | Intel Core i5 (8GB RAM) |
+| --- | --- | --- |
+| 3D U-Net | 51.01s | 348.25s |
+| **SpineContextResUNet** | **86.66s** | **792.49s** |
+| TotalSegmentator | 127.67s | **Crashed** |
 
-### Result Images
+---
 
-The evaluation files generated during testing, including subject-specific segmentation masks and sagittal visual overlays, are automatically stored in the `results/test/` directory for easy verification and analysis.
+### Training & Inference
 
-![segmentation_sample](https://github.com/Nithurshen/SpineContextResUNet/blob/main/results/verse2020_gradcam/sub-verse803_analysis.png)
-
-## Research Context
-
-This project was developed to address the "Black Box" and "Computational Inefficiency" problems in modern clinical AI. By providing a lightweight yet accurate localization map, **SpineContextResUNet** serves as a robust foundation for automated vertebral fracture detection and spinal deformity analysis.
+1. **Preprocessing:** All volumes should be resampled to **1mm³ isotropic resolution**. Intensities are clipped to **[-1000, 2000] HU** and normalized to [-1, 1].
+2. **Patch Size:** Training is performed on fixed patches of **$128\times128\times64$**.
+3. **Inference:** Uses a sliding-window approach with a 0.5 stride overlap and Gaussian importance weighting for reconstructed volumes.
