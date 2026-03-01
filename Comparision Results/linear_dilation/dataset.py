@@ -45,23 +45,19 @@ class SpineDataset(Dataset):
         return image, mask
 
     def _augment(self, image, mask):
-        # 1. Random Flip (Left-Right)
         if np.random.rand() > 0.5:
             image = np.flip(image, axis=2).copy()
             mask = np.flip(mask, axis=2).copy()
 
-        # 2. Random Flip (Up-Down)
         if np.random.rand() > 0.5:
             image = np.flip(image, axis=1).copy()
             mask = np.flip(mask, axis=1).copy()
 
-        # 3. Random 90 degree rotation (XY plane)
         if np.random.rand() > 0.5:
             k = np.random.randint(1, 4)
             image = np.rot90(image, k, axes=(1, 2)).copy()
             mask = np.rot90(mask, k, axes=(1, 2)).copy()
 
-        # 4. Intensity Shift (Simulates different scanner calibrations)
         if np.random.rand() > 0.5:
             shift = np.random.uniform(-0.1, 0.1)
             image = image + shift

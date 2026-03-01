@@ -27,7 +27,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def get_gaussian_window(patch_size):
-    """Generates a 3D Gaussian window for smooth patch blending."""
     d, h, w = patch_size
     z_win = torch.hann_window(d)
     y_win = torch.hann_window(h)
@@ -39,7 +38,6 @@ def get_gaussian_window(patch_size):
 
 
 def keep_largest_blob(mask):
-    """Removes small disconnected noise, keeping only the main spine structure."""
     labeled_mask, num_features = label(mask)
     if num_features == 0:
         return mask
@@ -49,15 +47,12 @@ def keep_largest_blob(mask):
     return (labeled_mask == largest_label).astype(np.float32)
 
 
-# --- METRIC FUNCTIONS ---
-
 def compute_dice(pred, gt):
     intersection = np.sum(pred * gt)
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
 
 
 def compute_iou(pred, gt):
-    """Computes Intersection over Union (IoU)."""
     intersection = np.sum(pred * gt)
     union = np.sum(pred) + np.sum(gt) - intersection
     if union == 0:
@@ -66,7 +61,6 @@ def compute_iou(pred, gt):
 
 
 def compute_recall(pred, gt):
-    """Computes Recall (Sensitivity): TP / (TP + FN)."""
     intersection = np.sum(pred * gt)
     total_gt = np.sum(gt)
     if total_gt == 0:
@@ -75,7 +69,6 @@ def compute_recall(pred, gt):
 
 
 def compute_precision(pred, gt):
-    """Computes Precision: TP / (TP + FP)."""
     intersection = np.sum(pred * gt)
     total_pred = np.sum(pred)
     if total_pred == 0:
@@ -83,13 +76,7 @@ def compute_precision(pred, gt):
     return intersection / (total_pred + 1e-6)
 
 
-# --- END METRIC FUNCTIONS ---
-
-
 def predict_sliding_window(model, vol):
-    """
-    Performs memory-efficient sliding window inference with Gaussian blending.
-    """
     d, h, w = vol.shape
     pd, ph, pw = PATCH_SIZE
 
@@ -156,7 +143,6 @@ def predict_sliding_window(model, vol):
 
 
 def save_visual(ct_vol, pred_mask, subject_id, output_dir):
-    """Saves a mid-sagittal slice of the segmentation overlay."""
     mid_idx = ct_vol.shape[0] // 2
 
     ct_slice = ct_vol[mid_idx, :, :].T
@@ -193,11 +179,10 @@ def run_evaluation():
 
     detailed_results = []
     print(f"--- Processing {len(vol_files)} Volumes from CTSpine1K ---")
-    
-    # Header format string (Removed HD95)
+
     header_fmt = "{:<20} | {:<8} | {:<8} | {:<8} | {:<9}"
     row_fmt = "{:<20} | {:<8.4f} | {:<8.4f} | {:<8.4f} | {:<9.4f}"
-    
+
     print(header_fmt.format("Subject ID", "Dice", "IoU", "Recall", "Precision"))
     print("-" * 65)
 
@@ -217,7 +202,7 @@ def run_evaluation():
 
         vol_nii = nib.as_closest_canonical(nib.load(vol_path))
         gt_nii = nib.as_closest_canonical(nib.load(label_path))
-        
+
         vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
         vol_data = (vol_data + 1000) / 3000
         gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
@@ -227,43 +212,42 @@ def run_evaluation():
         pred_bin = (pred_prob > 0.5).astype(np.float32)
         pred_bin = keep_largest_blob(pred_bin)
 
-        # --- Calculate Metrics (HD95 Removed) ---
         dice = compute_dice(pred_bin, gt_data)
         iou = compute_iou(pred_bin, gt_data)
         recall = compute_recall(pred_bin, gt_data)
         precision = compute_precision(pred_bin, gt_data)
 
-        detailed_results.append({
-            "ID": subject_id, 
-            "Dice": dice,
-            "IoU": iou,
-            "Recall": recall,
-            "Precision": precision
-        })
+        detailed_results.append(
+            {
+                "ID": subject_id,
+                "Dice": dice,
+                "IoU": iou,
+                "Recall": recall,
+                "Precision": precision,
+            }
+        )
 
         save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
         print(row_fmt.format(subject_id, dice, iou, recall, precision))
 
     if detailed_results:
-        # Create DataFrame
         df = pd.DataFrame(detailed_results)
-        
-        # Calculate summary statistics
+
         mean_dice = df["Dice"].mean()
         mean_iou = df["IoU"].mean()
         mean_recall = df["Recall"].mean()
         mean_prec = df["Precision"].mean()
-        
+
         print("\n" + "=" * 65)
         print("FINAL TEST SET PERFORMANCE SUMMARY")
         print(f"Mean Dice     : {mean_dice:.4f} ± {df['Dice'].std():.4f}")
         print(f"Mean IoU      : {mean_iou:.4f} ± {df['IoU'].std():.4f}")
         print(f"Mean Recall   : {mean_recall:.4f} ± {df['Recall'].std():.4f}")
         print(f"Mean Precision: {mean_prec:.4f} ± {df['Precision'].std():.4f}")
-        
-        best_case = df.loc[df['Dice'].idxmax()]
-        worst_case = df.loc[df['Dice'].idxmin()]
+
+        best_case = df.loc[df["Dice"].idxmax()]
+        worst_case = df.loc[df["Dice"].idxmin()]
 
         print(f"\nBest Case (Dice) : {best_case['Dice']:.4f} ({best_case['ID']})")
         print(f"Worst Case (Dice): {worst_case['Dice']:.4f} ({worst_case['ID']})")

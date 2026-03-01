@@ -51,6 +51,7 @@ def keep_largest_blob(mask):
 
 # --- METRIC FUNCTIONS ---
 
+
 def compute_dice(pred, gt):
     intersection = np.sum(pred * gt)
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
@@ -193,11 +194,11 @@ def run_evaluation():
 
     detailed_results = []
     print(f"--- Processing {len(vol_files)} Volumes from CTSpine1K ---")
-    
+
     # Header format string (Removed HD95)
     header_fmt = "{:<20} | {:<8} | {:<8} | {:<8} | {:<9}"
     row_fmt = "{:<20} | {:<8.4f} | {:<8.4f} | {:<8.4f} | {:<9.4f}"
-    
+
     print(header_fmt.format("Subject ID", "Dice", "IoU", "Recall", "Precision"))
     print("-" * 65)
 
@@ -217,7 +218,7 @@ def run_evaluation():
 
         vol_nii = nib.as_closest_canonical(nib.load(vol_path))
         gt_nii = nib.as_closest_canonical(nib.load(label_path))
-        
+
         vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
         vol_data = (vol_data + 1000) / 3000
         gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
@@ -233,13 +234,15 @@ def run_evaluation():
         recall = compute_recall(pred_bin, gt_data)
         precision = compute_precision(pred_bin, gt_data)
 
-        detailed_results.append({
-            "ID": subject_id, 
-            "Dice": dice,
-            "IoU": iou,
-            "Recall": recall,
-            "Precision": precision
-        })
+        detailed_results.append(
+            {
+                "ID": subject_id,
+                "Dice": dice,
+                "IoU": iou,
+                "Recall": recall,
+                "Precision": precision,
+            }
+        )
 
         save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
@@ -248,22 +251,22 @@ def run_evaluation():
     if detailed_results:
         # Create DataFrame
         df = pd.DataFrame(detailed_results)
-        
+
         # Calculate summary statistics
         mean_dice = df["Dice"].mean()
         mean_iou = df["IoU"].mean()
         mean_recall = df["Recall"].mean()
         mean_prec = df["Precision"].mean()
-        
+
         print("\n" + "=" * 65)
         print("FINAL TEST SET PERFORMANCE SUMMARY")
         print(f"Mean Dice     : {mean_dice:.4f} ± {df['Dice'].std():.4f}")
         print(f"Mean IoU      : {mean_iou:.4f} ± {df['IoU'].std():.4f}")
         print(f"Mean Recall   : {mean_recall:.4f} ± {df['Recall'].std():.4f}")
         print(f"Mean Precision: {mean_prec:.4f} ± {df['Precision'].std():.4f}")
-        
-        best_case = df.loc[df['Dice'].idxmax()]
-        worst_case = df.loc[df['Dice'].idxmin()]
+
+        best_case = df.loc[df["Dice"].idxmax()]
+        worst_case = df.loc[df["Dice"].idxmin()]
 
         print(f"\nBest Case (Dice) : {best_case['Dice']:.4f} ({best_case['ID']})")
         print(f"Worst Case (Dice): {worst_case['Dice']:.4f} ({worst_case['ID']})")

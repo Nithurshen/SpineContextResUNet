@@ -147,9 +147,7 @@ def save_visual(ct_vol, pred_mask, subject_id, output_dir):
     ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig(
-        os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black"
-    )
+    plt.savefig(os.path.join(output_dir, f"{subject_id}_seg.png"), facecolor="black")
     plt.close()
 
 
@@ -175,7 +173,9 @@ def run_evaluation():
         detailed_results = pd.read_csv(CSV_PATH).to_dict("records")
 
     print(f"--- Processing {len(vol_files)} VerSe Volumes ---")
-    print(f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}")
+    print(
+        f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}"
+    )
     print("-" * 65)
 
     for vol_path in tqdm(vol_files, desc="Inference"):
@@ -219,18 +219,22 @@ def run_evaluation():
 
             save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
-            detailed_results.append({
-                "ID": subject_id, 
-                "Dice": dice,
-                "IoU": iou,
-                "Recall": recall,
-                "Precision": precision,
-                "Time": elapsed_time
-            })
-            
+            detailed_results.append(
+                {
+                    "ID": subject_id,
+                    "Dice": dice,
+                    "IoU": iou,
+                    "Recall": recall,
+                    "Precision": precision,
+                    "Time": elapsed_time,
+                }
+            )
+
             pd.DataFrame(detailed_results).to_csv(CSV_PATH, index=False)
 
-            print(f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}")
+            print(
+                f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}"
+            )
 
         except Exception as e:
             print(f"Error processing {subject_id}: {e}")
@@ -250,7 +254,9 @@ def run_evaluation():
         print(f"IoU       : {np.mean(ious):.4f} ± {np.std(ious):.4f}")
         print(f"Recall    : {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
         print(f"Precision : {np.mean(precs):.4f} ± {np.std(precs):.4f}")
-        print(f"Time      : {np.mean([r['Time'] for r in detailed_results]):.2f} sec per volume")
+        print(
+            f"Time      : {np.mean([r['Time'] for r in detailed_results]):.2f} sec per volume"
+        )
         print("=" * 55)
 
 

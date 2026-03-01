@@ -11,27 +11,22 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import label
 import time
 
-# --- IMPORT YOUR NEW MODEL ---
 from model import SwinUNETR_Nano
 
-# --- CONFIGURATION ---
 DEVICE = "cpu"
 
-# Paths specific to VerSe dataset structure
 MODEL_PATH = "models/best_swin_model.pth"
 TEST_RAW_DIR = "data/raw/dataset-03test/rawdata/sub-verse714/"
 TEST_DERIV_DIR = "data/raw/dataset-03test/derivatives/sub-verse714/"
 RESULTS_DIR = "results/sample3"
 CSV_PATH = os.path.join(RESULTS_DIR, "test_metrics_swin_verse.csv")
 
-# SwinUNETR params
 PATCH_SIZE = (128, 128, 64)
 OVERLAP = 0.5
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def get_gaussian_window(patch_size):
-    """Generates a 3D Gaussian window for smooth patch blending."""
     d, h, w = patch_size
     z_win = torch.hann_window(d)
     y_win = torch.hann_window(h)
@@ -42,7 +37,6 @@ def get_gaussian_window(patch_size):
 
 
 def keep_largest_blob(mask):
-    """Removes small disconnected noise."""
     labeled_mask, num_features = label(mask)
     if num_features == 0:
         return mask
@@ -51,30 +45,29 @@ def keep_largest_blob(mask):
     largest_label = counts.argmax()
     return (labeled_mask == largest_label).astype(np.float32)
 
-# --- METRIC FUNCTIONS ---
+
 def compute_dice(pred, gt):
     intersection = np.sum(pred * gt)
     return (2.0 * intersection) / (np.sum(pred) + np.sum(gt) + 1e-6)
+
 
 def compute_iou(pred, gt):
     intersection = np.sum(pred * gt)
     union = np.sum(pred) + np.sum(gt) - intersection
     return (intersection + 1e-6) / (union + 1e-6)
 
+
 def compute_recall(pred, gt):
     intersection = np.sum(pred * gt)
     return (intersection + 1e-6) / (np.sum(gt) + 1e-6)
 
+
 def compute_precision(pred, gt):
     intersection = np.sum(pred * gt)
     return (intersection + 1e-6) / (np.sum(pred) + 1e-6)
-# ------------------------
+
 
 def predict_sliding_window(model, vol):
-    """
-    Memory-efficient sliding window inference for SwinUNETR.
-    Applies Sigmoid on logits.
-    """
     d, h, w = vol.shape
     pd, ph, pw = PATCH_SIZE
 
@@ -85,10 +78,15 @@ def predict_sliding_window(model, vol):
     stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
     vol_t = torch.from_numpy(vol).float()
 
-    # Calculate steps
-    z_steps = sorted(list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)])))
-    y_steps = sorted(list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)])))
-    x_steps = sorted(list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)])))
+    z_steps = sorted(
+        list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)]))
+    )
+    y_steps = sorted(
+        list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)]))
+    )
+    x_steps = sorted(
+        list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)]))
+    )
 
     model.eval()
 
@@ -99,7 +97,6 @@ def predict_sliding_window(model, vol):
                     slice_vol = vol_t[z : z + pd, y : y + ph, x : x + pw]
                     curr_d, curr_h, curr_w = slice_vol.shape
 
-                    # Pad edges if necessary
                     need_pad = False
                     if (curr_d, curr_h, curr_w) != PATCH_SIZE:
                         need_pad = True
@@ -112,11 +109,9 @@ def predict_sliding_window(model, vol):
                         ).squeeze()
 
                     patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
-                    
-                    # Inference
+
                     logits = model(patch)
-                    
-                    # *** Apply Sigmoid for Swin ***
+
                     pred_patch = torch.sigmoid(logits).squeeze()
 
                     weighted_pred = pred_patch * patch_window
@@ -126,10 +121,13 @@ def predict_sliding_window(model, vol):
                         weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
                         weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_pred.cpu()
-                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_win.cpu()
+                    prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_pred.cpu()
+                    )
+                    weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                        weighted_win.cpu()
+                    )
 
-                    # Explicit cleanup to help with large VerSe volumes
                     del patch, logits, pred_patch, weighted_pred, weighted_win
 
     weight_map[weight_map == 0] = 1.0
@@ -137,7 +135,6 @@ def predict_sliding_window(model, vol):
 
 
 def save_visual(ct_vol, pred_mask, subject_id, output_dir):
-    """Saves a simple overlay visualization."""
     mid_idx = ct_vol.shape[0] // 2
     ct_slice = ct_vol[mid_idx, :, :].T
     mask_slice = pred_mask[mid_idx, :, :].T
@@ -150,33 +147,32 @@ def save_visual(ct_vol, pred_mask, subject_id, output_dir):
     ax.imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
 
     ax.set_title(
-        f"Swin Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black"
+        f"Swin Prediction: {subject_id}",
+        fontsize=14,
+        color="white",
+        backgroundcolor="black",
     )
     ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig(
-        os.path.join(output_dir, f"{subject_id}_vis.png"), facecolor="black"
-    )
+    plt.savefig(os.path.join(output_dir, f"{subject_id}_vis.png"), facecolor="black")
     plt.close()
 
 
 def run_evaluation():
     print(f"--- Loading SwinUNETR-Nano on {DEVICE} ---")
     model = SwinUNETR_Nano(in_channels=1, out_channels=1).to(DEVICE)
-    
+
     if os.path.exists(MODEL_PATH):
         model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
     else:
         print(f"ERROR: Model weights not found at {MODEL_PATH}")
         return
 
-    # Recursive search for VerSe structure (BIDS format)
     vol_files = sorted(
         glob.glob(os.path.join(TEST_RAW_DIR, "**/*ct.nii.gz"), recursive=True)
     )
 
-    # Resume capability
     processed_ids = []
     if os.path.exists(CSV_PATH):
         try:
@@ -190,22 +186,21 @@ def run_evaluation():
         detailed_results = pd.read_csv(CSV_PATH).to_dict("records")
 
     print(f"--- Processing {len(vol_files)} VerSe Volumes ---")
-    print(f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}")
+    print(
+        f"{'Subject ID':<20} | {'Dice':<8} | {'IoU':<8} | {'Recall':<8} | {'Prec':<8}"
+    )
     print("-" * 65)
 
     for vol_path in tqdm(vol_files, desc="Inference"):
         file_name = os.path.basename(vol_path)
-        subject_id = file_name.split("_")[0] # e.g., 'sub-verse001'
+        subject_id = file_name.split("_")[0]
 
         if subject_id in processed_ids:
             continue
 
-        # Match label file in BIDS derivatives folder
-        # Pattern: sub-verse001_seg-vert_msk.nii.gz
         mask_pattern = os.path.join(TEST_DERIV_DIR, subject_id, "*_seg-vert_msk.nii.gz")
         potential_labels = glob.glob(mask_pattern)
 
-        # Fallback if folders aren't nested
         if not potential_labels:
             potential_labels = glob.glob(
                 os.path.join(TEST_DERIV_DIR, f"{subject_id}*_seg-vert_msk.nii.gz")
@@ -217,53 +212,49 @@ def run_evaluation():
         label_path = potential_labels[0]
 
         try:
-            # Load Data
             vol_nii = nib.as_closest_canonical(nib.load(vol_path))
             gt_nii = nib.as_closest_canonical(nib.load(label_path))
 
-            # Normalize (Must match training!)
             vol_data = np.clip(vol_nii.get_fdata(), -1000, 2000)
             vol_data = (vol_data + 1000) / 3000
             gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
 
-            # Inference
             t = time.time()
             pred_prob = predict_sliding_window(model, vol_data)
-            
-            # Post-processing
+
             pred_bin = (pred_prob > 0.5).astype(np.float32)
             pred_bin = keep_largest_blob(pred_bin)
 
             elapsed_time = time.time() - t
 
-            # Metrics
             dice = compute_dice(pred_bin, gt_data)
             iou = compute_iou(pred_bin, gt_data)
             recall = compute_recall(pred_bin, gt_data)
             precision = compute_precision(pred_bin, gt_data)
 
-            # Save Visuals & Logs
             save_visual(vol_data, pred_bin, subject_id, RESULTS_DIR)
 
-            detailed_results.append({
-                "ID": subject_id, 
-                "Dice": dice,
-                "IoU": iou,
-                "Recall": recall,
-                "Precision": precision,
-                "Time": elapsed_time
-            })
-            
-            # Incremental Save
+            detailed_results.append(
+                {
+                    "ID": subject_id,
+                    "Dice": dice,
+                    "IoU": iou,
+                    "Recall": recall,
+                    "Precision": precision,
+                    "Time": elapsed_time,
+                }
+            )
+
             pd.DataFrame(detailed_results).to_csv(CSV_PATH, index=False)
 
-            print(f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}")
+            print(
+                f"{subject_id:<20} | {dice:<8.4f} | {iou:<8.4f} | {recall:<8.4f} | {precision:<8.4f}"
+            )
 
         except Exception as e:
             print(f"Error processing {subject_id}: {e}")
 
         finally:
-            # Crucial for large 3D volumes
             gc.collect()
             torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
@@ -279,8 +270,11 @@ def run_evaluation():
         print(f"IoU       : {np.mean(ious):.4f} ± {np.std(ious):.4f}")
         print(f"Recall    : {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
         print(f"Precision : {np.mean(precs):.4f} ± {np.std(precs):.4f}")
-        print(f"Time      : {np.mean([r['Time'] for r in detailed_results]):.2f} sec per volume")
+        print(
+            f"Time      : {np.mean([r['Time'] for r in detailed_results]):.2f} sec per volume"
+        )
         print("=" * 55)
+
 
 if __name__ == "__main__":
     run_evaluation()

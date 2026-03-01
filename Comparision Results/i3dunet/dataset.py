@@ -29,7 +29,6 @@ class SpineDataset(Dataset):
         image = np.load(self.image_paths[idx])
         mask = np.load(self.mask_paths[idx])
 
-        # Ensure channel dimension exists
         if image.ndim == 3:
             image = image[np.newaxis, ...]
         if mask.ndim == 3:
@@ -41,29 +40,24 @@ class SpineDataset(Dataset):
         image = torch.from_numpy(image).float()
         mask = torch.from_numpy(mask).float()
 
-        # Binarize mask
         mask = (mask > 0.5).float()
 
         return image, mask
 
     def _augment(self, image, mask):
-        # 1. Random Flip (Left-Right)
         if np.random.rand() > 0.5:
             image = np.flip(image, axis=2).copy()
             mask = np.flip(mask, axis=2).copy()
 
-        # 2. Random Flip (Up-Down)
         if np.random.rand() > 0.5:
             image = np.flip(image, axis=1).copy()
             mask = np.flip(mask, axis=1).copy()
 
-        # 3. Random 90 degree rotation (XY plane)
         if np.random.rand() > 0.5:
             k = np.random.randint(1, 4)
             image = np.rot90(image, k, axes=(1, 2)).copy()
             mask = np.rot90(mask, k, axes=(1, 2)).copy()
 
-        # 4. Intensity Shift
         if np.random.rand() > 0.5:
             shift = np.random.uniform(-0.1, 0.1)
             image = image + shift

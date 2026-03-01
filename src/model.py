@@ -4,10 +4,6 @@ import torch.nn.functional as F
 
 
 class ResidualBlock(nn.Module):
-    """
-    Residual connections to prevent vanishing gradients.
-    """
-
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
@@ -32,11 +28,6 @@ class ResidualBlock(nn.Module):
 
 
 class ContextBlock(nn.Module):
-    """
-    Multi-Dilated Block to capture long-range spine context
-    without the computational cost of RNNs.
-    """
-
     def __init__(self, in_channels, out_channels):
         super(ContextBlock, self).__init__()
         self.d1 = nn.Conv3d(

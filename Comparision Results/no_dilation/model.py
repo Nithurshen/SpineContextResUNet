@@ -4,8 +4,6 @@ import torch.nn.functional as F
 
 
 class ResidualBlock(nn.Module):
-    """Standard Residual Block"""
-
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
@@ -30,16 +28,8 @@ class ResidualBlock(nn.Module):
 
 
 class ContextBlock_NoDilation(nn.Module):
-    """
-    ABLATION VERSION: No Dilation.
-    - All dilations set to 1.
-    - All paddings set to 1 (CRITICAL FIX).
-    This restricts the model to only see local features.
-    """
-
     def __init__(self, in_channels, out_channels):
         super(ContextBlock_NoDilation, self).__init__()
-        # FIX: Padding must be 1 if Dilation is 1
         self.d1 = nn.Conv3d(
             in_channels, out_channels, kernel_size=3, padding=1, dilation=1
         )
@@ -80,7 +70,6 @@ class SpineResUNet_NoDilation(nn.Module):
         self.enc3 = ResidualBlock(base_filters * 2, base_filters * 4)
         self.pool3 = nn.MaxPool3d(2)
 
-        # USE THE NO-DILATION CONTEXT BLOCK
         self.bottleneck = ContextBlock_NoDilation(base_filters * 4, base_filters * 8)
 
         self.up3 = nn.ConvTranspose3d(

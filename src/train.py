@@ -32,10 +32,6 @@ def dice_loss(pred, target):
 
 
 def save_visualization(epoch, img_tensor, mask_tensor, pred_tensor, save_dir):
-    """
-    Saves a 2D slice of the 3D patch for visual verification.
-    Layout: [Input Image] [Ground Truth] [Prediction]
-    """
     mid_slice = 32
 
     img_slice = img_tensor[0, 0, :, :, mid_slice].cpu().numpy()

@@ -1,7 +1,6 @@
 import os
 
 # --- CRITICAL FIX FOR MACOS / MPS ---
-# Enables CPU fallback for operations not yet implemented on MPS (like MaxPool3d)
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 import torch
@@ -14,17 +13,14 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import label
 from model import *
 
-# --- Configuration ---
 DEVICE = (
     "cuda"
     if torch.cuda.is_available()
     else ("mps" if torch.backends.mps.is_available() else "cpu")
 )
 
-# UPDATED: Model Path for the new architecture
 MODEL_PATH = "models/best_model_large_dilation.pth"
 
-# Single Instance Paths (Same as before)
 VOL_PATH = "data/raw/dataset-03test/rawdata/sub-verse803/sub-verse803_dir-iso_ct.nii.gz"
 MSK_PATH = "data/raw/dataset-03test/derivatives/sub-verse803/sub-verse803_dir-iso_seg-vert_msk.nii.gz"
 
@@ -109,10 +105,16 @@ def predict_sliding_window(model, vol, grad_cam):
     patch_window = get_gaussian_window(PATCH_SIZE).cpu()
 
     stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
-    
-    z_steps = sorted(list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)])))
-    y_steps = sorted(list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)])))
-    x_steps = sorted(list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)])))
+
+    z_steps = sorted(
+        list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)]))
+    )
+    y_steps = sorted(
+        list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)]))
+    )
+    x_steps = sorted(
+        list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)]))
+    )
 
     vol_t = torch.from_numpy(vol).float()
     model.eval()
@@ -151,11 +153,22 @@ def predict_sliding_window(model, vol, grad_cam):
                     weighted_cam = weighted_cam[:curr_d, :curr_h, :curr_w]
                     weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_pred
+                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_pred
+                )
                 cam_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_cam
-                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_win
+                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_win
+                )
 
-                del patch, pred_patch, cam_patch, weighted_pred, weighted_win, weighted_cam
+                del (
+                    patch,
+                    pred_patch,
+                    cam_patch,
+                    weighted_pred,
+                    weighted_win,
+                    weighted_cam,
+                )
 
     weight_map[weight_map == 0] = 1.0
     return (prob_map / weight_map).numpy(), (cam_map / weight_map).numpy()
@@ -208,21 +221,18 @@ def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
 
 def run_evaluation():
     print(f"--- Loading Model on {DEVICE} ---")
-    
-    # UPDATED: Instantiate the LaDilation model
+
     model = SpineResUNet_LaDilation().to(DEVICE)
-    
-    # Load state dict
+
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 
-    # Initialize GradCAM on the target layer (model.dec1 is still the correct target)
     grad_cam = SpineGradCAM(model, model.dec1)
 
     file_name = os.path.basename(VOL_PATH)
     subject_id = file_name.split("_")[0]
 
     print(f"--- Processing Single Instance: {subject_id} ---")
-    
+
     try:
         vol_nii = nib.as_closest_canonical(nib.load(VOL_PATH))
         gt_nii = nib.as_closest_canonical(nib.load(MSK_PATH))
@@ -232,7 +242,7 @@ def run_evaluation():
         gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
 
         pred_prob, cam_vol = predict_sliding_window(model, vol_data, grad_cam)
-        
+
         pred_bin = (pred_prob > 0.5).astype(np.float32)
         pred_bin = keep_largest_blob(pred_bin)
 
@@ -245,6 +255,7 @@ def run_evaluation():
     except Exception as e:
         print(f"Error processing {subject_id}: {e}")
         import traceback
+
         traceback.print_exc()
 
     finally:

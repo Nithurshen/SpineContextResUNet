@@ -4,8 +4,6 @@ import torch.nn.functional as F
 
 
 class ResidualBlock(nn.Module):
-    """Standard Residual Block"""
-
     def __init__(self, in_channels, out_channels):
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
@@ -30,11 +28,6 @@ class ResidualBlock(nn.Module):
 
 
 class ContextBlock_LaDilation(nn.Module):
-    """
-    ABLATION VERSION: Large.
-    Provides smoother, incremental context expansion compared to exponential dilation.
-    """
-
     def __init__(self, in_channels, out_channels):
         super(ContextBlock_LaDilation, self).__init__()
         self.d1 = nn.Conv3d(

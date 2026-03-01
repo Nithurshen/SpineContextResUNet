@@ -6,7 +6,6 @@ TARGET_DICE = 0.85
 
 
 def parse_log(filename):
-    """Parses the training log to extract metrics."""
     epochs = []
     train_losses = []
     val_losses = []
@@ -52,7 +51,6 @@ def parse_log(filename):
 
 
 def plot_metrics(data):
-    """Plots the metrics side by side."""
     if not data:
         return
 

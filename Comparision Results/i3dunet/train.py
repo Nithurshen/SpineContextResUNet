@@ -77,7 +77,6 @@ def train():
     os.makedirs(vis_dir, exist_ok=True)
     print(f"--> Visualizations will be saved to: {vis_dir}/")
 
-    # Instantiate model with base_filters=9
     model = Plain3DUNet(in_channels=1, out_channels=1, base_filters=9).to(DEVICE)
 
     optimizer = optim.Adam(model.parameters(), lr=LR)
@@ -151,9 +150,7 @@ def train():
             print("  --> New Best Model Saved!")
             print("-" * 30)
 
-        torch.save(
-            model.state_dict(), f"checkpoints_plain/model_epoch_{epoch + 1}.pth"
-        )
+        torch.save(model.state_dict(), f"checkpoints_plain/model_epoch_{epoch + 1}.pth")
 
 
 if __name__ == "__main__":

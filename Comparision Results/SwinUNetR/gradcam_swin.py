@@ -1,7 +1,6 @@
 import os
 
 # --- CRITICAL FIX FOR MACOS / MPS ---
-# Enables CPU fallback for operations not yet implemented on MPS
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 import torch
@@ -12,20 +11,16 @@ import gc
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
 
-# --- IMPORT MODEL FROM YOUR FILE ---
 from model import SwinUNETR_Nano
 
-# --- Configuration ---
 DEVICE = (
     "cuda"
     if torch.cuda.is_available()
     else ("mps" if torch.backends.mps.is_available() else "cpu")
 )
 
-# UPDATED: Path for the Swin model
 MODEL_PATH = "models/best_swin_model.pth"
 
-# Single Instance Paths
 VOL_PATH = "data/raw/dataset-03test/rawdata/sub-verse803/sub-verse803_dir-iso_ct.nii.gz"
 MSK_PATH = "data/raw/dataset-03test/derivatives/sub-verse803/sub-verse803_dir-iso_seg-vert_msk.nii.gz"
 
@@ -66,8 +61,7 @@ class SpineGradCAM:
         self.target_layer = target_layer
         self.activations = None
         self.gradients = None
-        
-        # Register hooks
+
         self.target_layer.register_forward_hook(self.save_activation)
         self.target_layer.register_full_backward_hook(self.save_gradient)
 
@@ -75,7 +69,6 @@ class SpineGradCAM:
         self.activations = output
 
     def save_gradient(self, module, grad_input, grad_output):
-        # Tuple handling for safety
         if isinstance(grad_output, tuple):
             self.gradients = grad_output[0]
         else:
@@ -86,24 +79,18 @@ class SpineGradCAM:
 
         with torch.amp.autocast("cuda", enabled=use_amp):
             output = self.model(input_tensor)
-            # Use mean of logits as target for backprop
             target = torch.logit(output, eps=1e-6).mean()
 
         self.model.zero_grad()
         target.backward()
 
-        # SwinUNETR Decoder outputs 5D tensors (B, C, D, H, W)
-        # So we can use standard global average pooling over spatial dims (2, 3, 4)
         pooled_grads = torch.mean(self.gradients, dim=(2, 3, 4), keepdim=True)
-        
-        # Weighted Activations
+
         weighted_activations = self.activations * pooled_grads
-        
-        # Generate Heatmap (sum over channels)
+
         heatmap = torch.sum(weighted_activations, dim=1, keepdim=True)
         heatmap = F.relu(heatmap)
 
-        # Upsample to match input patch size
         heatmap = F.interpolate(
             heatmap.float(),
             size=input_tensor.shape[2:],
@@ -124,10 +111,16 @@ def predict_sliding_window(model, vol, grad_cam):
     patch_window = get_gaussian_window(PATCH_SIZE).cpu()
 
     stride_d, stride_h, stride_w = [int(p * (1 - OVERLAP)) for p in PATCH_SIZE]
-    
-    z_steps = sorted(list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)])))
-    y_steps = sorted(list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)])))
-    x_steps = sorted(list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)])))
+
+    z_steps = sorted(
+        list(set(list(range(0, d - pd + stride_d, stride_d)) + [max(0, d - pd)]))
+    )
+    y_steps = sorted(
+        list(set(list(range(0, h - ph + stride_h, stride_h)) + [max(0, h - ph)]))
+    )
+    x_steps = sorted(
+        list(set(list(range(0, w - pw + stride_w, stride_w)) + [max(0, w - pw)]))
+    )
 
     vol_t = torch.from_numpy(vol).float()
     model.eval()
@@ -138,7 +131,6 @@ def predict_sliding_window(model, vol, grad_cam):
                 slice_vol = vol_t[z : z + pd, y : y + ph, x : x + pw]
                 curr_d, curr_h, curr_w = slice_vol.shape
 
-                # Padding logic if patch is smaller than PATCH_SIZE (edge cases)
                 need_pad = False
                 if (curr_d, curr_h, curr_w) != PATCH_SIZE:
                     need_pad = True
@@ -153,29 +145,36 @@ def predict_sliding_window(model, vol, grad_cam):
                 patch = slice_vol.unsqueeze(0).unsqueeze(0).to(DEVICE)
                 patch.requires_grad = True
 
-                # --- GradCAM Inference ---
                 pred_patch, cam_patch = grad_cam.compute_patch(patch)
 
                 pred_patch = pred_patch.squeeze().cpu()
                 cam_patch = cam_patch.squeeze().cpu()
 
-                # Apply Gaussian window weighting
                 weighted_pred = pred_patch * patch_window
                 weighted_cam = cam_patch * patch_window
                 weighted_win = patch_window.clone()
 
-                # Remove padding if applied
                 if need_pad:
                     weighted_pred = weighted_pred[:curr_d, :curr_h, :curr_w]
                     weighted_cam = weighted_cam[:curr_d, :curr_h, :curr_w]
                     weighted_win = weighted_win[:curr_d, :curr_h, :curr_w]
 
-                # Accumulate results
-                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_pred
+                prob_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_pred
+                )
                 cam_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_cam
-                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += weighted_win
+                weight_map[z : z + curr_d, y : y + curr_h, x : x + curr_w] += (
+                    weighted_win
+                )
 
-                del patch, pred_patch, cam_patch, weighted_pred, weighted_win, weighted_cam
+                del (
+                    patch,
+                    pred_patch,
+                    cam_patch,
+                    weighted_pred,
+                    weighted_win,
+                    weighted_cam,
+                )
 
     weight_map[weight_map == 0] = 1.0
     return (prob_map / weight_map).numpy(), (cam_map / weight_map).numpy()
@@ -197,17 +196,22 @@ def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
 
     fig, ax = plt.subplots(1, 2, figsize=(16, 12))
 
-    # Prediction
     ax[0].imshow(ct_slice, cmap="gray", origin="lower")
     masked_pred = np.ma.masked_where(binary_mask == 0, binary_mask)
     ax[0].imshow(masked_pred, cmap="winter", alpha=0.5, origin="lower")
-    ax[0].set_title(f"Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black")
+    ax[0].set_title(
+        f"Prediction: {subject_id}", fontsize=14, color="white", backgroundcolor="black"
+    )
     ax[0].axis("off")
 
-    # Grad-CAM
     ax[1].imshow(ct_slice, cmap="gray", origin="lower")
     im = ax[1].imshow(cam_slice, cmap="jet", alpha=0.5, origin="lower", vmin=0, vmax=1)
-    ax[1].set_title(f"Grad-CAM (Logits): {subject_id}", fontsize=14, color="white", backgroundcolor="black")
+    ax[1].set_title(
+        f"Grad-CAM (Logits): {subject_id}",
+        fontsize=14,
+        color="white",
+        backgroundcolor="black",
+    )
     ax[1].axis("off")
 
     cbar = plt.colorbar(im, ax=ax[1], fraction=0.046, pad=0.04)
@@ -223,28 +227,24 @@ def save_visual(ct_vol, pred_mask, cam_vol, subject_id, output_dir):
 
 def run_evaluation():
     print(f"--- Loading Model on {DEVICE} ---")
-    
-    # UPDATED: Instantiate SwinUNETR_Nano
+
     model = SwinUNETR_Nano().to(DEVICE)
-    
+
     try:
         model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
     except FileNotFoundError:
         print(f"Error: Model file not found at {MODEL_PATH}")
         return
 
-    # UPDATED: Target Layer for SwinUNETR
-    # We target 'decoder1', which is the last decoder block before the output 1x1 conv.
-    # It contains the upsampled, high-level features with spatial dimensions.
     target_layer = model.swin.decoder1
-    
+
     grad_cam = SpineGradCAM(model, target_layer)
 
     file_name = os.path.basename(VOL_PATH)
     subject_id = file_name.split("_")[0]
 
     print(f"--- Processing Single Instance: {subject_id} ---")
-    
+
     try:
         vol_nii = nib.as_closest_canonical(nib.load(VOL_PATH))
         gt_nii = nib.as_closest_canonical(nib.load(MSK_PATH))
@@ -254,7 +254,7 @@ def run_evaluation():
         gt_data = (gt_nii.get_fdata() > 0).astype(np.float32)
 
         pred_prob, cam_vol = predict_sliding_window(model, vol_data, grad_cam)
-        
+
         pred_bin = (pred_prob > 0.5).astype(np.float32)
         pred_bin = keep_largest_blob(pred_bin)
 
@@ -267,6 +267,7 @@ def run_evaluation():
     except Exception as e:
         print(f"Error processing {subject_id}: {e}")
         import traceback
+
         traceback.print_exc()
 
     finally:
